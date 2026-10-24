@@ -26,9 +26,14 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
 
   useEffect(() => {
     if (state?.message && !state.success) {
-      if (state.message.toLowerCase().includes('email not confirmed')) {
+      if (state.message.toLowerCase().includes('email logins are disabled')) {
+        toast.error('Email logins are disabled in Supabase', {
+          description: 'Enable it in Supabase Dashboard: Auth ➔ Providers ➔ Email ➔ Turn ON Enable Email provider.',
+          duration: 8000,
+        })
+      } else if (state.message.toLowerCase().includes('email not confirmed')) {
         toast.error('Email not confirmed in Supabase', {
-          description: 'Please confirm your email or run auto-confirm.sql in Supabase SQL editor.',
+          description: 'Please confirm your email or run fix-auth.sql in Supabase SQL editor.',
         })
       } else if (state.message.toLowerCase().includes('invalid login credentials')) {
         toast.error('Invalid email or password', {
@@ -98,6 +103,21 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
               <span>⚠️</span>
               <span>{state.message}</span>
             </div>
+            {state.message.toLowerCase().includes('email logins are disabled') && (
+              <div className="pt-2 border-t border-red-200 text-[11px] space-y-2 text-slate-800">
+                <p className="font-semibold text-red-600">The Email Provider is turned OFF in your Supabase project.</p>
+                <div className="bg-white/80 p-2.5 rounded-lg border border-red-100 space-y-1 text-[11px]">
+                  <p className="font-medium text-slate-900">How to enable it (10 seconds):</p>
+                  <ol className="list-decimal pl-4 space-y-0.5 text-slate-700">
+                    <li>Open <strong>Supabase Dashboard</strong></li>
+                    <li>Go to <strong>Authentication</strong> ➔ <strong>Providers</strong> ➔ <strong>Email</strong></li>
+                    <li>Turn the top switch <strong>&quot;Enable Email provider&quot;</strong> to <strong>ON</strong> (green)</li>
+                    <li>(Optional) Turn <strong>&quot;Confirm email&quot;</strong> to <strong>OFF</strong></li>
+                    <li>Click <strong>Save</strong> at the bottom</li>
+                  </ol>
+                </div>
+              </div>
+            )}
             {state.message.toLowerCase().includes('email not confirmed') && (
               <div className="pt-2 border-t border-red-200 text-[11px] space-y-1.5 text-slate-800">
                 <p className="font-medium">To fix this in your Supabase project (choose one):</p>
