@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Menu, Search, Bell } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 import ThemeToggle from './ThemeToggle'
+import SoundToggle from './SoundToggle'
 import Avatar from '@/app/components/ui/Avatar'
 import { cn } from '@/lib/utils'
 
@@ -61,6 +62,7 @@ export default function Topbar({ user, profile, unreadCount, onMenuOpen }: Topba
       </Link>
 
       <div className="flex items-center gap-2 ml-auto">
+        <SoundToggle />
         <ThemeToggle />
 
         {/* Notifications */}

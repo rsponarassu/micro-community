@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { Users, Lock } from 'lucide-react'
 import { joinCommunity, leaveCommunity } from '@/app/actions/communities'
 import { toast } from 'sonner'
+import { sound } from '@/lib/sound'
 import Badge from './ui/Badge'
 
 export interface CommunityCardData {
@@ -43,20 +44,24 @@ export default function CommunityCard({
         setIsMember(false)
         setStatus(null)
         setMemberCount((c) => Math.max(0, c - 1))
+        sound.playPop()
         toast.success(`Left ${community.name}`)
       } else {
         const res = await joinCommunity(community.id)
         if (res.status === 'pending') {
           setStatus('pending')
+          sound.playNotification()
           toast.info('Join request submitted. Awaiting moderator approval.')
         } else {
           setIsMember(true)
           setStatus('active')
           setMemberCount((c) => c + 1)
+          sound.playSuccess()
           toast.success(`Joined ${community.name}!`)
         }
       }
     } catch (err: unknown) {
+      sound.playError()
       const msg = err instanceof Error ? err.message : 'Action failed'
       toast.error(msg)
     } finally {
@@ -67,7 +72,8 @@ export default function CommunityCard({
   return (
     <Link
       href={`/c/${community.slug}`}
-      className="card group hover:shadow-lg transition-all flex flex-col overflow-hidden border border-border bg-surface hover:border-brand/40"
+      onClick={() => sound.playClick()}
+      className="card group hover:-translate-y-1.5 hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden border border-border bg-surface hover:border-brand/60 rounded-2xl relative"
     >
       {/* Cover Banner */}
       <div className="h-24 w-full relative bg-surface-raised overflow-hidden">

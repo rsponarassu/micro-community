@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { Shield, Image as ImageIcon, X } from 'lucide-react'
+import { sound } from '@/lib/sound'
 
 interface PostFormProps {
   communityId: string
@@ -29,6 +30,7 @@ export default function PostForm({
 
   useEffect(() => {
     if (state?.success) {
+      sound.playSuccess()
       toast.success(
         isAnonymous
           ? 'Anonymous post published!'
@@ -40,8 +42,10 @@ export default function PostForm({
       formRef.current?.reset()
       onSuccess?.()
     } else if (state?.message && !state.success) {
+      sound.playError()
       toast.error(state.message)
     } else if (state?.errors?.content?.[0]) {
+      sound.playError()
       toast.error(state.errors.content[0])
     }
   }, [state, isAnonymous, onSuccess])

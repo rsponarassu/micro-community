@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import CommunityCard from '@/app/components/CommunityCard'
+import VideoHero from '@/app/components/ui/VideoHero'
+import ScrollReveal from '@/app/components/ui/ScrollReveal'
 
 export const metadata: Metadata = {
   title: 'Discover Communities',
@@ -44,8 +46,6 @@ export default async function DiscoverPage({
   }
 
   const { data: rawCommunities, error } = await query
-  // Cast needed because placeholder types don't fully satisfy Supabase's partial-select inference.
-  // This will resolve automatically once real generated types are in place (M2).
   const communities = rawCommunities as CommunityRow[] | null
 
   // Fetch member counts for all returned communities in one query
@@ -89,51 +89,62 @@ export default async function DiscoverPage({
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold mb-1 text-foreground">
-            Discover Communities
-          </h1>
-          <p className="text-sm text-muted">
-            Find and join focused groups that match your interests
-          </p>
+    <div className="space-y-6">
+      {/* Video Hero Spotlight Banner */}
+      {!q && (!category || category === 'All') && (
+        <ScrollReveal animation="fade-down" duration={700}>
+          <VideoHero />
+        </ScrollReveal>
+      )}
+
+      <ScrollReveal animation="fade-up" delay={100}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Discover Communities
+            </h1>
+            <p className="text-sm text-muted">
+              Find and join focused groups that match your interests
+            </p>
+          </div>
+          <Link
+            href="/c/new"
+            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-brand hover:bg-brand-hover text-white transition-all shadow-md shadow-brand/20 active:scale-95 shrink-0"
+          >
+            + Create Community
+          </Link>
         </div>
-        <Link
-          href="/c/new"
-          className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium bg-brand hover:bg-brand-hover text-white transition-colors shadow-xs shrink-0"
-        >
-          + Create Community
-        </Link>
-      </div>
+      </ScrollReveal>
 
       {/* Search + filter */}
-      <form method="GET" className="flex flex-col sm:flex-row gap-3 mb-6">
-        <input
-          name="q"
-          defaultValue={q}
-          placeholder="Search communities…"
-          className="flex-1 px-3.5 py-2 rounded-lg text-sm bg-surface border border-border text-foreground placeholder:text-muted focus:ring-2 focus:ring-brand focus:outline-hidden transition-all"
-        />
-        <select
-          name="category"
-          defaultValue={category ?? 'All'}
-          className="px-3.5 py-2 rounded-lg text-sm bg-surface border border-border text-foreground focus:ring-2 focus:ring-brand focus:outline-hidden transition-all"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover transition-colors"
-        >
-          Search
-        </button>
-      </form>
+      <ScrollReveal animation="fade-up" delay={150}>
+        <form method="GET" className="flex flex-col sm:flex-row gap-3">
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="Search communities…"
+            className="flex-1 px-4 py-2.5 rounded-xl text-sm bg-surface border border-border text-foreground placeholder:text-muted focus:ring-2 focus:ring-brand focus:outline-hidden transition-all shadow-xs"
+          />
+          <select
+            name="category"
+            defaultValue={category ?? 'All'}
+            className="px-4 py-2.5 rounded-xl text-sm bg-surface border border-border text-foreground focus:ring-2 focus:ring-brand focus:outline-hidden transition-all shadow-xs"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand hover:bg-brand-hover transition-all shadow-xs active:scale-95"
+          >
+            Search
+          </button>
+        </form>
+      </ScrollReveal>
 
       {error && (
-        <div className="p-4 rounded-lg text-sm mb-4 bg-red-500/10 border border-red-500/20 text-red-500">
+        <div className="p-4 rounded-xl text-sm bg-red-500/10 border border-red-500/20 text-red-500">
           Failed to load communities. Please try again.
         </div>
       )}
@@ -149,7 +160,7 @@ export default async function DiscoverPage({
           </p>
           <Link
             href="/c/new"
-            className="inline-flex px-4 py-2 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover transition-colors"
+            className="inline-flex px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand hover:bg-brand-hover transition-all"
           >
             Create Community
           </Link>
@@ -157,18 +168,24 @@ export default async function DiscoverPage({
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {(communities ?? []).map((c) => {
+        {(communities ?? []).map((c, idx) => {
           const mStatus = userMemberships[c.id]
           return (
-            <CommunityCard
+            <ScrollReveal
               key={c.id}
-              community={{
-                ...c,
-                memberCount: memberCounts[c.id] ?? 0,
-                isMember: mStatus === 'active',
-                membershipStatus: mStatus ?? null,
-              }}
-            />
+              animation="fade-up"
+              delay={Math.min(idx * 60, 400)}
+              duration={500}
+            >
+              <CommunityCard
+                community={{
+                  ...c,
+                  memberCount: memberCounts[c.id] ?? 0,
+                  isMember: mStatus === 'active',
+                  membershipStatus: mStatus ?? null,
+                }}
+              />
+            </ScrollReveal>
           )
         })}
       </div>

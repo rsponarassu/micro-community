@@ -74,7 +74,7 @@ export default function PostCard({
     : `#`
 
   return (
-    <article className="card p-5 border border-border bg-surface hover:border-brand/30 transition-all space-y-3.5">
+    <article className="card p-5 sm:p-6 border border-border bg-surface hover:-translate-y-1 hover:shadow-xl hover:border-brand/40 transition-all duration-300 rounded-2xl space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -192,16 +192,28 @@ export default function PostCard({
         {post.content}
       </p>
 
-      {/* Optional attached image */}
+      {/* Optional attached media (video or image) */}
       {post.image_url && (
-        <div className="relative w-full h-64 sm:h-80 rounded-xl overflow-hidden border border-border bg-surface-raised">
-          <Image
-            src={post.image_url}
-            alt="Attached media"
-            fill
-            className="object-cover"
-            unoptimized
-          />
+        <div className="relative w-full rounded-2xl overflow-hidden border border-border bg-surface-raised shadow-xs">
+          {post.image_url.match(/\.(mp4|webm|ogg)($|\?)/i) ? (
+            <video
+              src={post.image_url}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full max-h-96 object-contain bg-black/90 rounded-2xl"
+            />
+          ) : (
+            <div className="relative w-full h-64 sm:h-80">
+              <Image
+                src={post.image_url}
+                alt="Attached media"
+                fill
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          )}
         </div>
       )}
 

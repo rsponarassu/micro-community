@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { toggleReaction } from '@/app/actions/posts'
 import { toast } from 'sonner'
+import { sound } from '@/lib/sound'
 
 export type ReactionType = 'like' | 'love' | 'laugh' | 'wow' | 'sad' | 'angry'
 
@@ -31,9 +32,12 @@ export default function ReactionBar({
 
   async function handleReact(type: ReactionType) {
     if (!isAuthenticated) {
+      sound.playNotification()
       toast.info('Please log in to react to posts.')
       return
     }
+
+    sound.playPop()
 
     // Optimistic state update
     setReactions((prev) => {

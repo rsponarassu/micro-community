@@ -8,6 +8,7 @@ import { formatRelative } from '@/lib/utils'
 import { createComment, deleteComment } from '@/app/actions/comments'
 import { Shield, CornerDownRight, Trash2, Flag } from 'lucide-react'
 import { toast } from 'sonner'
+import { sound } from '@/lib/sound'
 import ReportModal from './ReportModal'
 
 export interface CommentPublicData {
@@ -93,14 +94,17 @@ export default function CommentThread({
     try {
       const res = await createComment(undefined, formData)
       if (res?.message) {
+        sound.playError()
         toast.error(res.message)
       } else {
         setReplyText('')
         setReplyingTo(null)
         setIsAnonReply(false)
+        sound.playSuccess()
         toast.success(isAnonReply ? 'Anonymous comment posted' : 'Comment posted')
       }
     } catch {
+      sound.playError()
       toast.error('Failed to post comment')
     } finally {
       setIsSubmitting(false)

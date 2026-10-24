@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import PostCard, { type PostPublicData } from '@/app/components/PostCard'
 import PostForm from '@/app/components/PostForm'
 import type { ReactionType } from '@/app/components/ReactionBar'
+import ScrollReveal from '@/app/components/ui/ScrollReveal'
 
 interface CommunityFeedPageProps {
   params: Promise<{ slug: string }>
@@ -129,27 +130,35 @@ export default async function CommunityFeedPage({
 
       {/* Posts List */}
       {posts.length === 0 ? (
-        <div className="card p-12 text-center border border-border bg-surface">
-          <div className="text-4xl mb-3">💬</div>
-          <h3 className="text-base font-semibold text-foreground">No posts yet</h3>
-          <p className="text-sm text-muted mt-1">
-            Be the first to share an update, question, or anonymous thought with this community!
-          </p>
-        </div>
+        <ScrollReveal animation="fade-up">
+          <div className="card p-12 text-center border border-border bg-surface">
+            <div className="text-4xl mb-3">💬</div>
+            <h3 className="text-base font-semibold text-foreground">No posts yet</h3>
+            <p className="text-sm text-muted mt-1">
+              Be the first to share an update, question, or anonymous thought with this community!
+            </p>
+          </div>
+        </ScrollReveal>
       ) : (
         <div className="space-y-4">
-          {posts.map((post) => (
-            <PostCard
+          {posts.map((post, idx) => (
+            <ScrollReveal
               key={post.id}
-              post={{
-                ...post,
-                community_slug: community.slug,
-                reactions: reactionMap[post.id] ?? [],
-                commentCount: commentCounts[post.id] ?? 0,
-                canModerate,
-              }}
-              currentUserId={user?.id}
-            />
+              animation="fade-up"
+              delay={Math.min(idx * 60, 300)}
+              duration={500}
+            >
+              <PostCard
+                post={{
+                  ...post,
+                  community_slug: community.slug,
+                  reactions: reactionMap[post.id] ?? [],
+                  commentCount: commentCounts[post.id] ?? 0,
+                  canModerate,
+                }}
+                currentUserId={user?.id}
+              />
+            </ScrollReveal>
           ))}
         </div>
       )}

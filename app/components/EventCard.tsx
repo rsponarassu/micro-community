@@ -7,6 +7,7 @@ import { rsvpEvent, unrsvpEvent } from '@/app/actions/events'
 import { formatDate, getGCalUrl } from '@/lib/utils'
 import { Calendar, MapPin, Video, Users, Download, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
+import { sound } from '@/lib/sound'
 import Badge from './ui/Badge'
 
 export interface EventData {
@@ -53,6 +54,7 @@ export default function EventCard({
         await unrsvpEvent(event.id)
         if (rsvp === 'going') setGoingCount((c) => Math.max(0, c - 1))
         setRsvp(null)
+        sound.playClick()
         toast.info('RSVP removed')
       } else {
         await rsvpEvent(event.id, newStatus)
@@ -62,9 +64,15 @@ export default function EventCard({
           setGoingCount((c) => Math.max(0, c - 1))
         }
         setRsvp(newStatus)
+        if (newStatus === 'going') {
+          sound.playSuccess()
+        } else {
+          sound.playPop()
+        }
         toast.success(newStatus === 'going' ? 'See you there!' : 'Marked as interested')
       }
     } catch (err: unknown) {
+      sound.playError()
       toast.error(err instanceof Error ? err.message : 'RSVP failed')
     } finally {
       setLoading(false)
@@ -82,7 +90,7 @@ export default function EventCard({
   })
 
   return (
-    <div className="card overflow-hidden border border-border bg-surface hover:border-brand/40 transition-all flex flex-col">
+    <div className="card overflow-hidden border border-border bg-surface hover:-translate-y-1.5 hover:shadow-xl hover:border-brand/40 transition-all duration-300 rounded-2xl flex flex-col">
       {event.cover_url && (
         <div className="h-40 w-full relative bg-surface-raised overflow-hidden">
           <Image

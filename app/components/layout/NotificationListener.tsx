@@ -3,6 +3,7 @@
 import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { sound } from '@/lib/sound'
 
 function NotificationListenerInner() {
   const searchParams = useSearchParams()
@@ -15,8 +16,10 @@ function NotificationListenerInner() {
     if (!toastCode && !errorMsg) return
 
     if (errorMsg) {
+      sound.playError()
       toast.error(decodeURIComponent(errorMsg))
     } else if (toastCode) {
+      sound.playSuccess()
       switch (toastCode) {
         case 'logged_in':
           toast.success('Logged in successfully! Welcome back.')
