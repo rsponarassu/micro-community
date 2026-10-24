@@ -72,7 +72,9 @@ export async function signIn(
   }
 
   revalidatePath('/', 'layout')
-  redirect(formData.get('next')?.toString() ?? '/')
+  const next = formData.get('next')?.toString() || '/'
+  const redirectUrl = next.includes('?') ? `${next}&toast=logged_in` : `${next}?toast=logged_in`
+  redirect(redirectUrl)
 }
 
 export async function signUp(
@@ -111,7 +113,7 @@ export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
-  redirect('/login')
+  redirect('/login?toast=logged_out')
 }
 
 export async function forgotPassword(
@@ -163,7 +165,7 @@ export async function resetPassword(
   }
 
   revalidatePath('/', 'layout')
-  redirect('/')
+  redirect('/login?toast=custom&msg=Password+updated+successfully!+Please+log+in.')
 }
 
 export async function completeOnboarding(
@@ -213,5 +215,5 @@ export async function completeOnboarding(
   }
 
   revalidatePath('/', 'layout')
-  redirect('/')
+  redirect('/?toast=profile_completed')
 }

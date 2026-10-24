@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { completeOnboarding, type AuthFormState } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import Avatar from '@/app/components/ui/Avatar'
@@ -34,6 +34,15 @@ export default function SettingsForm({
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl)
   const [uploading, setUploading] = useState(false)
   const [theme, setTheme] = useState<string>('light')
+
+  useEffect(() => {
+    if (state?.message && !state.success) {
+      toast.error(state.message)
+    } else if (state?.errors) {
+      const firstError = Object.values(state.errors)[0]?.[0]
+      if (firstError) toast.error(firstError)
+    }
+  }, [state])
 
   // Theme toggle
   function handleThemeChange(newTheme: 'light' | 'dark') {

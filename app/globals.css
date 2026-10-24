@@ -249,3 +249,22 @@ body {
 }
 .prose-content p { margin-bottom: 0.75rem; }
 .prose-content p:last-child { margin-bottom: 0; }
+
+/* ============================================================
+   TOP NOTIFICATION BAR (TOAST)
+   ============================================================ */
+
+.top-notification-pill {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 9999px !important;
+  font-family: inherit;
+  font-weight: 500;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .top-notification-pill {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px 1px rgba(120, 80, 255, 0.15);
+}

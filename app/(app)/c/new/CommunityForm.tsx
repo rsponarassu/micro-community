@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { createCommunity, type CommunityFormState } from '@/app/actions/communities'
 import { createClient } from '@/lib/supabase/client'
 import { slugify } from '@/lib/utils'
@@ -25,6 +25,15 @@ export default function CommunityForm() {
   const [iconUrl, setIconUrl] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
   const [uploading, setUploading] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (state?.message && !state.success) {
+      toast.error(state.message)
+    } else if (state?.errors) {
+      const firstError = Object.values(state.errors)[0]?.[0]
+      if (firstError) toast.error(firstError)
+    }
+  }, [state])
 
   function handleNameChange(val: string) {
     setName(val)

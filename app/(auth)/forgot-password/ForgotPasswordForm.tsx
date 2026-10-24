@@ -1,14 +1,25 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
 import Link from 'next/link'
 import { forgotPassword, type AuthFormState } from '@/app/actions/auth'
+import { toast } from 'sonner'
 
 export default function ForgotPasswordForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(
     forgotPassword,
     undefined
   )
+
+  useEffect(() => {
+    if (state?.success) {
+      toast.success('Password reset link sent! Check your email.')
+    } else if (state?.message && !state.success) {
+      toast.error(state.message)
+    } else if (state?.errors?.email?.[0]) {
+      toast.error(state.errors.email[0])
+    }
+  }, [state])
 
   if (state?.success) {
     return (

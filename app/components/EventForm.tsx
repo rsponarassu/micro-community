@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { createEvent, type EventFormState } from '@/app/actions/events'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -27,6 +27,26 @@ export default function EventForm({ communityId, onSuccess }: EventFormProps) {
   const [capacity, setCapacity] = useState('')
   const [coverUrl, setCoverUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    if (state?.success) {
+      toast.success('Event scheduled successfully!')
+      setTitle('')
+      setDescription('')
+      setLocation('')
+      setOnlineUrl('')
+      setStartsAt('')
+      setEndsAt('')
+      setCapacity('')
+      setCoverUrl('')
+      onSuccess?.()
+    } else if (state?.message && !state.success) {
+      toast.error(state.message)
+    } else if (state?.errors) {
+      const firstError = Object.values(state.errors)[0]?.[0]
+      if (firstError) toast.error(firstError)
+    }
+  }, [state, onSuccess])
 
   async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

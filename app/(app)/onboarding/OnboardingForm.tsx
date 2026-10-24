@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect } from 'react'
 import { completeOnboarding, type AuthFormState } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import Avatar from '@/app/components/ui/Avatar'
@@ -29,6 +29,15 @@ export default function OnboardingForm({
   const [bio, setBio] = useState('')
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl)
   const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    if (state?.message && !state.success) {
+      toast.error(state.message)
+    } else if (state?.errors) {
+      const firstError = Object.values(state.errors)[0]?.[0]
+      if (firstError) toast.error(firstError)
+    }
+  }, [state])
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

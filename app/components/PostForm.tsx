@@ -39,6 +39,10 @@ export default function PostForm({
       setIsAnonymous(false)
       formRef.current?.reset()
       onSuccess?.()
+    } else if (state?.message && !state.success) {
+      toast.error(state.message)
+    } else if (state?.errors?.content?.[0]) {
+      toast.error(state.errors.content[0])
     }
   }, [state, isAnonymous, onSuccess])
 

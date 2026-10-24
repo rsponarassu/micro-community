@@ -1,13 +1,22 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
 import { resetPassword, type AuthFormState } from '@/app/actions/auth'
+import { toast } from 'sonner'
 
 export default function ResetPasswordForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(
     resetPassword,
     undefined
   )
+
+  useEffect(() => {
+    if (state?.message && !state.success) {
+      toast.error(state.message)
+    } else if (state?.errors?.password?.[0]) {
+      toast.error(state.errors.password[0])
+    }
+  }, [state])
 
   return (
     <form action={action} className="space-y-4">

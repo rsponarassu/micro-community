@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
 import Link from 'next/link'
 import { signUp, type AuthFormState } from '@/app/actions/auth'
+import { toast } from 'sonner'
 
 function FieldError({ errors }: { errors?: string[] }) {
   if (!errors?.length) return null
@@ -18,6 +19,19 @@ export default function SignupForm() {
     signUp,
     undefined
   )
+
+  useEffect(() => {
+    if (state?.success) {
+      toast.success('Account created successfully!', {
+        description: 'Please check your email to verify your account or proceed to login.',
+      })
+    } else if (state?.message && !state.success) {
+      toast.error(state.message)
+    } else if (state?.errors) {
+      const firstError = Object.values(state.errors)[0]?.[0]
+      if (firstError) toast.error(firstError)
+    }
+  }, [state])
 
   if (state?.success) {
     return (

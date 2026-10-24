@@ -96,7 +96,7 @@ export async function createCommunity(
 
   revalidatePath('/discover')
   revalidatePath('/', 'layout')
-  redirect(`/c/${community.slug}`)
+  redirect(`/c/${community.slug}?toast=community_created`)
 }
 
 export async function joinCommunity(communityId: string) {

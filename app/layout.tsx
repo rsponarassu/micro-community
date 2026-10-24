@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster } from 'sonner'
+import NotificationListener from '@/app/components/layout/NotificationListener'
 import './globals.css'
 
 const inter = Inter({
@@ -38,12 +39,14 @@ export default function RootLayout({
       <head />
       <body className={`${inter.variable} min-h-dvh antialiased`}>
         {children}
+        <NotificationListener />
         <Toaster
-          position="top-right"
+          position="top-center"
           richColors
           closeButton
           toastOptions={{
             duration: 4000,
+            className: 'top-notification-pill',
           }}
         />
       </body>
