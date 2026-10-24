@@ -46,23 +46,34 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
   }, [state])
 
   function handleFillDemo() {
-    setEmail('demouser9992@gmail.com')
+    setEmail('alex@microcommunity.com')
     setPassword('Password123')
-    toast.info('Filled credentials. Click Sign In!')
+    toast.info('Filled credentials: alex@microcommunity.com / Password123')
+  }
+
+  const [copied, setCopied] = useState(false)
+  function copySql() {
+    navigator.clipboard.writeText('UPDATE auth.users SET email_confirmed_at = now();')
+    setCopied(true)
+    toast.success('SQL copied to clipboard!')
+    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
     <div className="space-y-4">
       {/* Quick fill banner */}
-      <div className="p-3 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2 text-foreground font-medium">
-          <Sparkles className="w-4 h-4 text-brand shrink-0" />
-          <span>Need a quick account?</span>
+      <div className="p-3.5 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-between text-xs">
+        <div>
+          <div className="flex items-center gap-1.5 text-foreground font-semibold">
+            <Sparkles className="w-4 h-4 text-brand shrink-0" />
+            <span>Demo Test Account</span>
+          </div>
+          <span className="text-[11px] text-muted">alex@microcommunity.com / Password123</span>
         </div>
         <button
           type="button"
           onClick={handleFillDemo}
-          className="px-2.5 py-1 rounded-md bg-brand text-white font-medium hover:bg-brand-dark transition-colors"
+          className="px-3 py-1.5 rounded-lg bg-brand text-white font-medium hover:bg-brand-dark transition-colors shadow-xs"
         >
           Fill Demo User
         </button>
@@ -75,15 +86,34 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
 
         {state?.message && !state.success && (
           <div
-            className="p-3 rounded-lg text-sm"
+            className="p-3.5 rounded-xl text-xs space-y-2"
             style={{
-              background: 'hsl(0 84% 95%)',
+              background: 'hsl(0 84% 96%)',
               color: 'var(--color-error)',
-              border: '1px solid hsl(0 84% 85%)',
+              border: '1px solid hsl(0 84% 88%)',
             }}
             role="alert"
           >
-            {state.message}
+            <div className="font-semibold flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>{state.message}</span>
+            </div>
+            {state.message.toLowerCase().includes('email not confirmed') && (
+              <div className="pt-2 border-t border-red-200 text-[11px] space-y-1.5 text-slate-800">
+                <p className="font-medium">To fix this in your Supabase project (choose one):</p>
+                <div className="flex items-center gap-2 bg-white/80 p-2 rounded-lg font-mono text-[10px] border border-red-100">
+                  <span className="flex-1 truncate">UPDATE auth.users SET email_confirmed_at = now();</span>
+                  <button
+                    type="button"
+                    onClick={copySql}
+                    className="px-2 py-0.5 rounded bg-brand text-white font-sans text-[10px] shrink-0"
+                  >
+                    {copied ? 'Copied!' : 'Copy SQL'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted">Or in Supabase: <strong>Auth ➔ Providers ➔ Email ➔ Turn OFF Confirm email</strong></p>
+              </div>
+            )}
           </div>
         )}
 
