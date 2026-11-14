@@ -57,11 +57,11 @@ export default function SignupForm() {
     <form action={action} className="space-y-4">
       {state?.message && !state.success && (
         <div
-          className="p-3 rounded-lg text-sm"
+          className="rounded-[var(--radius-md)] border p-3 text-sm"
           style={{
-            background: 'hsl(0 84% 95%)',
-            color: 'var(--color-error)',
-            border: '1px solid hsl(0 84% 85%)',
+            background: 'var(--color-danger-subtle)',
+            color: 'var(--color-danger)',
+            borderColor: 'var(--color-danger)',
           }}
           role="alert"
         >

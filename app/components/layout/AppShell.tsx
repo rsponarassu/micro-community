@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -35,47 +36,62 @@ export default function AppShell({
   children,
 }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const pathname = usePathname()
+  const closeSidebar = useCallback(() => setSidebarOpen(false), [])
 
-  // Apply saved theme on mount
+  // Close the drawer when the route changes. Done during render (guarded by a
+  // comparison) instead of in an effect, which would cost an extra paint.
+  const [openedAtPath, setOpenedAtPath] = useState(pathname)
+  if (pathname !== openedAtPath) {
+    setOpenedAtPath(pathname)
+    setSidebarOpen(false)
+  }
+
+  // Escape closes the drawer.
   useEffect(() => {
-    const saved = localStorage.getItem('theme') ?? 'light'
-    document.documentElement.setAttribute('data-theme', saved)
-  }, [])
+    if (!sidebarOpen) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSidebarOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [sidebarOpen])
 
   return (
     <div className="app-shell">
-      {/* Desktop Sidebar */}
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
+
       <Sidebar
         user={user}
         profile={profile}
         joinedCommunities={joinedCommunities}
         isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        onClose={closeSidebar}
       />
 
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden animate-fade-in"
+          onClick={closeSidebar}
           aria-hidden="true"
         />
       )}
 
-      <div className="main-content flex flex-col w-full">
+      <div className="main-content flex flex-col w-full min-w-0">
         <Topbar
           user={user}
           profile={profile}
           unreadCount={unreadCount}
           onMenuOpen={() => setSidebarOpen(true)}
         />
-        <main className="flex-1 px-4 py-6 lg:px-8 max-w-5xl mx-auto w-full">
+        <main id="main" tabIndex={-1} className="flex-1 outline-none">
           {children}
         </main>
       </div>
 
-      {/* Mobile Bottom Nav */}
-      <MobileNav unreadCount={unreadCount} />
+      <MobileNav unreadCount={unreadCount} username={profile?.username} />
     </div>
   )
 }

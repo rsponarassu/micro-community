@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import Avatar from '@/app/components/ui/Avatar'
@@ -8,7 +8,7 @@ import Badge from '@/app/components/ui/Badge'
 import ReactionBar, { type ReactionType } from './ReactionBar'
 import { formatRelative } from '@/lib/utils'
 import { deletePost, togglePostPin } from '@/app/actions/posts'
-import { MessageSquare, Shield, MoreVertical, Pin, Flag } from 'lucide-react'
+import { MessageSquare, Shield, MoreHorizontal, Pin, Flag, Hash } from 'lucide-react'
 import { toast } from 'sonner'
 import ReportModal from './ReportModal'
 
@@ -25,6 +25,7 @@ export interface PostPublicData {
   author_display_name: string | null
   author_avatar_url: string | null
   community_slug?: string
+  community_name?: string
   reactions?: { type: ReactionType; count: number; reacted: boolean }[]
   commentCount?: number
   isAuthor?: boolean
@@ -43,12 +44,27 @@ export default function PostCard({
   const [deleted, setDeleted] = useState(false)
   const [isPinned, setIsPinned] = useState(post.is_pinned)
 
+  useEffect(() => {
+    if (!menuOpen) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [menuOpen])
+
   if (deleted) return null
 
-  const isAuthor = !post.is_anonymous && currentUserId && post.author_id === currentUserId
-  const canManage = isAuthor || post.canModerate
+  const isAuthor = !post.is_anonymous && currentUserId === post.author_id
+  const canManage = Boolean(isAuthor || post.canModerate)
+  const canModerate = Boolean(post.canModerate)
+
+  const postHref = post.community_slug
+    ? `/c/${post.community_slug}/post/${post.id}`
+    : '#'
 
   async function handleDelete() {
+    setMenuOpen(false)
     try {
       await deletePost(post.id)
       setDeleted(true)
@@ -59,125 +75,158 @@ export default function PostCard({
   }
 
   async function handleTogglePin() {
+    setMenuOpen(false)
     try {
       await togglePostPin(post.id, isPinned)
       setIsPinned(!isPinned)
       toast.success(isPinned ? 'Post unpinned.' : 'Post pinned to top.')
-      setMenuOpen(false)
     } catch {
       toast.error('Could not update pin status.')
     }
   }
 
-  const postDetailHref = post.community_slug
-    ? `/c/${post.community_slug}/post/${post.id}`
-    : `#`
+  const authorName = post.is_anonymous
+    ? 'Anonymous member'
+    : post.author_display_name || post.author_username || 'Member'
 
   return (
-    <article className="card p-5 sm:p-6 border border-border bg-surface hover:-translate-y-1 hover:shadow-xl hover:border-brand/40 transition-all duration-300 rounded-2xl space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {post.is_anonymous ? (
-            <div className="w-10 h-10 rounded-full bg-surface-raised border border-border flex items-center justify-center text-muted shrink-0">
-              <Shield className="w-5 h-5 text-brand" />
-            </div>
-          ) : (
-            <Link
-              href={post.author_username ? `/u/${post.author_username}` : '#'}
-              className="hover:opacity-85 transition-opacity shrink-0"
-            >
-              <Avatar
-                src={post.author_avatar_url}
-                name={post.author_display_name || post.author_username || 'Member'}
-                size={40}
-              />
-            </Link>
-          )}
+    <article className="card card-interactive p-4 sm:p-5">
+      <header className="flex items-start gap-3">
+        {post.is_anonymous ? (
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised">
+            <Shield size={16} className="text-brand" aria-hidden="true" />
+          </span>
+        ) : (
+          <Link
+            href={post.author_username ? `/u/${post.author_username}` : '#'}
+            className="shrink-0 rounded-full"
+            aria-label={`View ${authorName}'s profile`}
+          >
+            <Avatar
+              src={post.author_avatar_url}
+              name={authorName}
+              size={36}
+            />
+          </Link>
+        )}
 
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {post.is_anonymous ? (
-                <span className="font-semibold text-sm text-foreground">
-                  Anonymous Member
-                </span>
-              ) : (
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {post.is_anonymous ? (
+              <span className="font-semibold text-foreground">{authorName}</span>
+            ) : (
+              <Link
+                href={post.author_username ? `/u/${post.author_username}` : '#'}
+                className="font-semibold text-foreground hover:text-brand transition-colors truncate"
+              >
+                {authorName}
+              </Link>
+            )}
+
+            {!post.is_anonymous && post.author_username && (
+              <span className="text-xs text-muted truncate">
+                @{post.author_username}
+              </span>
+            )}
+
+            {post.is_anonymous && <Badge variant="brand">Anonymous</Badge>}
+
+            {isPinned && (
+              <Badge variant="warning">
+                <Pin size={10} /> Pinned
+              </Badge>
+            )}
+          </div>
+
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+            {post.community_slug && post.community_name && (
+              <>
                 <Link
-                  href={post.author_username ? `/u/${post.author_username}` : '#'}
-                  className="font-semibold text-sm text-foreground hover:text-brand transition-colors"
+                  href={`/c/${post.community_slug}`}
+                  className="inline-flex items-center gap-1 hover:text-brand transition-colors"
                 >
-                  {post.author_display_name || post.author_username}
+                  <Hash size={11} />
+                  {post.community_name}
                 </Link>
-              )}
-
-              {post.is_anonymous ? (
-                <Badge variant="default">Anonymous</Badge>
-              ) : (
-                post.author_username && (
-                  <span className="text-xs text-muted">@{post.author_username}</span>
-                )
-              )}
-
-              {isPinned && (
-                <Badge variant="brand">
-                  <Pin className="w-3 h-3 mr-0.5 inline" /> Pinned
-                </Badge>
-              )}
-            </div>
-
-            <div className="text-xs text-muted mt-0.5">
-              {formatRelative(post.created_at)}
-            </div>
+                <span aria-hidden="true">·</span>
+              </>
+            )}
+            <Link
+              href={postHref}
+              className="hover:text-text-secondary transition-colors"
+            >
+              <time dateTime={post.created_at}>{formatRelative(post.created_at)}</time>
+            </Link>
           </div>
         </div>
 
-        {/* Post Options Menu */}
         {currentUserId && (
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-1.5 rounded-lg hover:bg-surface-raised text-muted hover:text-foreground transition-colors"
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="btn btn-ghost !p-1.5"
               aria-label="Post actions"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
             >
-              <MoreVertical className="w-4 h-4" />
+              <MoreHorizontal size={16} />
             </button>
 
             {menuOpen && (
               <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 mt-1 w-36 rounded-xl bg-surface border border-border shadow-xl p-1 z-20 text-xs">
-                  {post.canModerate && (
+                <div
+                  className="fixed inset-0 z-20"
+                  onClick={() => setMenuOpen(false)}
+                  aria-hidden="true"
+                />
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full z-30 mt-1 w-44 rounded-lg border border-border bg-surface p-1 shadow-lg animate-scale-in"
+                >
+                  {canModerate && (
                     <button
+                      type="button"
+                      role="menuitem"
                       onClick={handleTogglePin}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-raised text-foreground font-medium transition-colors"
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-foreground hover:bg-surface-overlay transition-colors"
                     >
-                      {isPinned ? 'Unpin Post' : 'Pin Post'}
+                      <Pin size={12} />
+                      {isPinned ? 'Unpin post' : 'Pin post'}
                     </button>
                   )}
+
                   {canManage && (
                     <button
+                      type="button"
+                      role="menuitem"
                       onClick={handleDelete}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-500/10 text-red-500 font-medium transition-colors"
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-danger hover:bg-danger-subtle transition-colors"
                     >
-                      Delete Post
+                      Delete post
                     </button>
                   )}
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setReportOpen(true)
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-raised text-muted hover:text-foreground font-medium transition-colors flex items-center gap-1.5"
-                  >
-                    <Flag className="w-3 h-3 text-amber-500" />
-                    <span>Report Post</span>
-                  </button>
+
+                  {!isAuthor && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setReportOpen(true)
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs font-medium text-text-secondary hover:bg-surface-overlay hover:text-text-primary transition-colors"
+                    >
+                      <Flag size={12} />
+                      Report post
+                    </button>
+                  )}
                 </div>
               </>
             )}
           </div>
         )}
-      </div>
+      </header>
 
       <ReportModal
         isOpen={reportOpen}
@@ -187,29 +236,29 @@ export default function PostCard({
         communityId={post.community_id}
       />
 
-      {/* Content */}
-      <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">
+      <div className="mt-3 prose-content text-[14.5px] text-foreground whitespace-pre-line">
         {post.content}
-      </p>
+      </div>
 
-      {/* Optional attached media (video or image) */}
       {post.image_url && (
-        <div className="relative w-full rounded-2xl overflow-hidden border border-border bg-surface-raised shadow-xs">
-          {post.image_url.match(/\.(mp4|webm|ogg)($|\?)/i) ? (
+        <div className="mt-3 overflow-hidden rounded-lg border border-border bg-surface-raised">
+          {/\.(mp4|webm|ogg)($|\?)/i.test(post.image_url) ? (
             <video
               src={post.image_url}
               controls
               playsInline
               preload="metadata"
-              className="w-full max-h-96 object-contain bg-black/90 rounded-2xl"
+              className="max-h-96 w-full bg-black object-contain"
             />
           ) : (
-            <div className="relative w-full h-64 sm:h-80">
+            <div className="relative aspect-4/3 w-full sm:aspect-16/10">
               <Image
                 src={post.image_url}
-                alt="Attached media"
+                alt=""
                 fill
+                sizes="(max-width: 768px) 100vw, 640px"
                 className="object-cover"
+                loading="lazy"
                 unoptimized
               />
             </div>
@@ -217,22 +266,22 @@ export default function PostCard({
         </div>
       )}
 
-      {/* Footer: Reactions + Comments count */}
-      <div className="pt-3 border-t border-border flex items-center justify-between gap-4">
+      <footer className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-2.5">
         <ReactionBar
           postId={post.id}
           initialReactions={post.reactions ?? []}
-          isAuthenticated={!!currentUserId}
+          isAuthenticated={Boolean(currentUserId)}
         />
 
         <Link
-          href={postDetailHref}
-          className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-foreground transition-colors shrink-0"
+          href={postHref}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted hover:bg-surface-overlay hover:text-text-primary transition-colors"
+          aria-label={`Open discussion, ${post.commentCount ?? 0} comments`}
         >
-          <MessageSquare className="w-4 h-4" />
-          <span>{post.commentCount ?? 0}</span>
+          <MessageSquare size={15} />
+          {post.commentCount ?? 0}
         </Link>
-      </div>
+      </footer>
     </article>
   )
 }

@@ -1,35 +1,63 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import { Moon, Sun } from 'lucide-react'
 
-export default function ThemeToggle() {
-  // Lazy initializer reads from localStorage on client; falls back to 'light' during SSR
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window === 'undefined') return 'light'
-    return (localStorage.getItem('theme') as 'light' | 'dark') ?? 'light'
-  })
+type Theme = 'light' | 'dark'
 
-  // Keep DOM in sync with state — only DOM update here, never setState
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
+/**
+ * The document element is the single source of truth: the inline head script
+ * sets `data-theme` before paint, and we subscribe to it here. This avoids both
+ * a hydration mismatch and a state-syncing effect.
+ */
+function subscribe(onChange: () => void) {
+  const observer = new MutationObserver(onChange)
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  })
+  return () => observer.disconnect()
+}
+
+function getSnapshot(): Theme {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+}
+
+// The server cannot know the stored preference; hydration starts from the
+// default and React re-reads the DOM immediately after mounting.
+function getServerSnapshot(): Theme {
+  return 'light'
+}
+
+export default function ThemeToggle() {
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   const toggle = useCallback(() => {
-    const next = theme === 'light' ? 'dark' : 'light'
-    localStorage.setItem('theme', next)
-    setTheme(next)
-  }, [theme])
+    const root = document.documentElement
+    const next: Theme = root.dataset.theme === 'dark' ? 'light' : 'dark'
+
+    root.setAttribute('data-theme', next)
+    root.style.colorScheme = next
+    try {
+      localStorage.setItem('theme', next)
+    } catch {
+      // Private mode — the switch still applies for this session.
+    }
+  }, [])
+
+  const label = `Switch to ${theme === 'light' ? 'dark' : 'light'} mode`
 
   return (
     <button
+      type="button"
       onClick={toggle}
-      className="p-2 rounded-lg transition-all hover:bg-[var(--color-surface-overlay)]"
-      style={{ color: 'var(--color-text-secondary)' }}
-      aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-      title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+      className="btn btn-ghost !rounded-lg !p-2"
+      aria-label={label}
+      title={label}
     >
-      {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+      <span className="flex h-[18px] w-[18px] items-center justify-center" aria-hidden="true">
+        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+      </span>
     </button>
   )
 }

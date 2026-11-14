@@ -6,7 +6,7 @@
 -- • Uses ALTER TABLE ... ADD COLUMN IF NOT EXISTS for new columns
 -- • Uses CREATE OR REPLACE for functions and views
 -- • Uses DROP POLICY IF EXISTS before CREATE POLICY (idempotent RLS)
--- • Run in Supabase SQL Editor: https://supabase.com/dashboard/project/mfgmaxoffhpsxzshobow/sql/new
+-- • Run in Supabase SQL Editor (Dashboard → SQL Editor → New query)
 -- =============================================================
 
 -- =============================================================
@@ -350,6 +350,12 @@ FROM public.comments c
 LEFT JOIN public.profiles pr ON pr.id = c.user_id
 WHERE c.is_hidden = FALSE;
 
+-- Views default to the OWNER's privileges, which silently bypasses RLS on the
+-- base tables. With security_invoker the policies below decide what a caller
+-- can see (public-community content: anyone; private-community content: members).
+ALTER VIEW public.posts_public SET (security_invoker = true);
+ALTER VIEW public.comments_public SET (security_invoker = true);
+
 -- =============================================================
 -- SECURITY DEFINER HELPERS
 -- =============================================================
@@ -481,14 +487,23 @@ CREATE POLICY "members: own leave"    ON public.community_members FOR DELETE
 CREATE POLICY "members: mod manage"   ON public.community_members FOR UPDATE
   USING (public.is_mod_or_owner(community_id));
 
--- ----- POSTS (base table — only mods can read; normal users go via posts_public view) -----
+-- ----- POSTS (base table — mods need raw access; everyone else reads posts_public) -----
 DROP POLICY IF EXISTS "posts: member read"       ON public.posts;
+DROP POLICY IF EXISTS "posts: read"             ON public.posts;
 DROP POLICY IF EXISTS "posts: member create"     ON public.posts;
 DROP POLICY IF EXISTS "posts: mod update"        ON public.posts;
 DROP POLICY IF EXISTS "posts: mod delete"        ON public.posts;
 
-CREATE POLICY "posts: member read"    ON public.posts FOR SELECT
-  USING (public.is_member(community_id));
+-- Public communities are readable by everyone (their feed is public);
+-- private communities stay member-only.
+CREATE POLICY "posts: read"           ON public.posts FOR SELECT
+  USING (
+    public.is_member(community_id)
+    OR EXISTS (
+      SELECT 1 FROM public.communities c
+      WHERE c.id = community_id AND c.is_private = FALSE
+    )
+  );
 CREATE POLICY "posts: member create"  ON public.posts FOR INSERT
   WITH CHECK (public.is_member(community_id) AND user_id = auth.uid());
 CREATE POLICY "posts: mod update"     ON public.posts FOR UPDATE
@@ -498,11 +513,20 @@ CREATE POLICY "posts: mod delete"     ON public.posts FOR DELETE
 
 -- ----- COMMENTS -----
 DROP POLICY IF EXISTS "comments: member read"    ON public.comments;
+DROP POLICY IF EXISTS "comments: read"          ON public.comments;
 DROP POLICY IF EXISTS "comments: member create"  ON public.comments;
 DROP POLICY IF EXISTS "comments: mod delete"     ON public.comments;
 
-CREATE POLICY "comments: member read"   ON public.comments FOR SELECT
-  USING (public.is_member((SELECT community_id FROM public.posts WHERE id = post_id)));
+CREATE POLICY "comments: read"         ON public.comments FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.posts p
+      JOIN public.communities c ON c.id = p.community_id
+      WHERE p.id = post_id
+        AND (public.is_member(p.community_id) OR c.is_private = FALSE)
+    )
+  );
 CREATE POLICY "comments: member create" ON public.comments FOR INSERT
   WITH CHECK (
     user_id = auth.uid() AND
@@ -516,11 +540,21 @@ CREATE POLICY "comments: mod delete"    ON public.comments FOR DELETE
 
 -- ----- REACTIONS -----
 DROP POLICY IF EXISTS "reactions: member read"    ON public.reactions;
+DROP POLICY IF EXISTS "reactions: read"          ON public.reactions;
 DROP POLICY IF EXISTS "reactions: member write"   ON public.reactions;
 DROP POLICY IF EXISTS "reactions: own delete"     ON public.reactions;
 
-CREATE POLICY "reactions: member read"  ON public.reactions FOR SELECT
-  USING (public.is_member((SELECT community_id FROM public.posts WHERE id = post_id)));
+-- Mirrors the post read rule so reaction counts also resolve on public feeds.
+CREATE POLICY "reactions: read"        ON public.reactions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.posts p
+      JOIN public.communities c ON c.id = p.community_id
+      WHERE p.id = post_id
+        AND (public.is_member(p.community_id) OR c.is_private = FALSE)
+    )
+  );
 CREATE POLICY "reactions: member write" ON public.reactions FOR INSERT
   WITH CHECK (
     user_id = auth.uid() AND

@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import PostCard, { type PostPublicData } from '@/app/components/PostCard'
 import PostForm from '@/app/components/PostForm'
-import type { ReactionType } from '@/app/components/ReactionBar'
 import ScrollReveal from '@/app/components/ui/ScrollReveal'
+import { loadPostMeta } from '@/lib/feed'
 
 interface CommunityFeedPageProps {
   params: Promise<{ slug: string }>
@@ -66,94 +66,67 @@ export default async function CommunityFeedPage({
   const posts = (rawPosts ?? []) as PostPublicData[]
   const postIds = posts.map((p) => p.id)
 
-  // Fetch reaction counts & current user reaction status
-  const reactionMap: Record<
-    string,
-    { type: ReactionType; count: number; reacted: boolean }[]
-  > = {}
+  // Reactions + comment counts come from one shared helper so the community
+  // feed, home feed and search always agree on the numbers.
+  const [meta, profileRes] = await Promise.all([
+    loadPostMeta(supabase, postIds, user?.id),
+    user
+      ? supabase
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('id', user.id)
+          .single()
+      : Promise.resolve({ data: null }),
+  ])
 
-  if (postIds.length > 0) {
-    const { data: rawReactions } = await supabase
-      .from('reactions')
-      .select('post_id, user_id, type')
-      .in('post_id', postIds)
-
-    const rxList = (rawReactions ?? []) as {
-      post_id: string
-      user_id: string
-      type: ReactionType
-    }[]
-
-    rxList.forEach((r) => {
-      if (!reactionMap[r.post_id]) {
-        reactionMap[r.post_id] = []
-      }
-      const existing = reactionMap[r.post_id].find((x) => x.type === r.type)
-      const isMine = user?.id === r.user_id
-      if (existing) {
-        existing.count += 1
-        if (isMine) existing.reacted = true
-      } else {
-        reactionMap[r.post_id].push({
-          type: r.type,
-          count: 1,
-          reacted: isMine,
-        })
-      }
-    })
-  }
-
-  // Fetch comment counts
-  const commentCounts: Record<string, number> = {}
-  if (postIds.length > 0) {
-    const { data: rawComments } = await supabase
-      .from('comments_public')
-      .select('post_id')
-      .in('post_id', postIds)
-
-    const cList = (rawComments ?? []) as { post_id: string }[]
-    cList.forEach((c) => {
-      commentCounts[c.post_id] = (commentCounts[c.post_id] ?? 0) + 1
-    })
-  }
+  const myProfile = profileRes.data as
+    | { display_name: string | null; avatar_url: string | null }
+    | null
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-4">
       {/* Post creation box */}
       {isMember ? (
-        <PostForm communityId={community.id} />
+        <PostForm
+          communityId={community.id}
+          avatarUrl={myProfile?.avatar_url}
+          displayName={myProfile?.display_name ?? undefined}
+        />
       ) : (
-        <div className="card p-4 border border-border bg-surface-raised text-center text-sm text-muted">
-          Join this community to share posts and discussions.
+        <div className="card px-4 py-5 text-center text-sm text-muted">
+          Join this community to start posting and taking part in discussions.
         </div>
       )}
 
       {/* Posts List */}
       {posts.length === 0 ? (
         <ScrollReveal animation="fade-up">
-          <div className="card p-12 text-center border border-border bg-surface">
-            <div className="text-4xl mb-3">💬</div>
-            <h3 className="text-base font-semibold text-foreground">No posts yet</h3>
-            <p className="text-sm text-muted mt-1">
-              Be the first to share an update, question, or anonymous thought with this community!
+          <div className="card px-6 py-16 text-center">
+            <div className="text-3xl" aria-hidden="true">
+              💬
+            </div>
+            <h2 className="mt-3 text-base font-semibold text-foreground">No posts yet</h2>
+            <p className="mt-1 text-sm text-muted">
+              Be the first to share an update, a question, or an anonymous thought.
             </p>
           </div>
         </ScrollReveal>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {posts.map((post, idx) => (
             <ScrollReveal
               key={post.id}
               animation="fade-up"
-              delay={Math.min(idx * 60, 300)}
-              duration={500}
+              delay={Math.min(idx * 50, 250)}
+              duration={450}
             >
               <PostCard
                 post={{
                   ...post,
                   community_slug: community.slug,
-                  reactions: reactionMap[post.id] ?? [],
-                  commentCount: commentCounts[post.id] ?? 0,
+                  community_name: community.name,
+                  reactions: meta.reactions[post.id] ?? [],
+                  commentCount: meta.commentCounts[post.id] ?? 0,
                   canModerate,
                 }}
                 currentUserId={user?.id}

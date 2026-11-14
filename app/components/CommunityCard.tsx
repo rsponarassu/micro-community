@@ -70,38 +70,42 @@ export default function CommunityCard({
   }
 
   return (
-    <Link
-      href={`/c/${community.slug}`}
-      onClick={() => sound.playClick()}
-      className="card group hover:-translate-y-1.5 hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden border border-border bg-surface hover:border-brand/60 rounded-2xl relative"
-    >
+    <article className="card card-interactive group relative flex flex-col overflow-hidden">
+      {/* Overlay link: keeps the whole card clickable without nesting a
+          <button> inside an <a> (invalid HTML, and unreachable by keyboard). */}
+      <Link
+        href={`/c/${community.slug}`}
+        onClick={() => sound.playClick()}
+        aria-label={`Open ${community.name}`}
+        className="absolute inset-0 z-10 rounded-[var(--radius-lg)]"
+      />
+
       {/* Cover Banner */}
-      <div className="h-24 w-full relative bg-surface-raised overflow-hidden">
+      <div className="relative h-24 w-full overflow-hidden bg-surface-raised">
         {community.cover_url ? (
           <Image
             src={community.cover_url}
             alt=""
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-300"
-            unoptimized
+            sizes="(max-width: 640px) 100vw, 320px"
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="w-full h-full bg-linear-to-r from-brand/20 to-purple-500/20" />
+          <div className="h-full w-full bg-linear-to-r from-brand/25 via-accent/15 to-brand/10" />
         )}
       </div>
 
-      <div className="p-4 pt-0 flex-1 flex flex-col relative">
+      <div className="relative flex flex-1 flex-col p-4 pt-0">
         {/* Avatar positioned over banner */}
-        <div className="flex justify-between items-end -mt-6 mb-3">
-          <div className="w-12 h-12 rounded-xl border-2 border-surface bg-surface-raised overflow-hidden flex items-center justify-center font-bold text-lg shadow-xs text-foreground">
+        <div className="relative z-20 -mb-1 flex items-end justify-between">
+          <div className="-mt-6 flex h-12 w-12 items-center justify-center overflow-hidden rounded-[var(--radius-md)] border-2 border-surface bg-surface-raised text-lg font-bold text-foreground shadow-xs">
             {community.icon_url ? (
               <Image
                 src={community.icon_url}
                 alt=""
                 width={48}
                 height={48}
-                className="w-full h-full object-cover"
-                unoptimized
+                className="h-full w-full object-cover"
               />
             ) : (
               <span>{community.name[0].toUpperCase()}</span>
@@ -109,60 +113,69 @@ export default function CommunityCard({
           </div>
 
           <button
+            type="button"
             onClick={handleJoinToggle}
             disabled={loading || status === 'pending' || status === 'banned'}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60 ${
+            aria-label={
+              isMember ? `Leave ${community.name}` : `Join ${community.name}`
+            }
+            className={`btn btn-sm relative z-20 ${
               isMember
-                ? 'bg-surface-raised hover:bg-red-500/10 hover:text-red-500 border border-border text-muted'
-                : status === 'pending'
-                ? 'bg-amber-500/10 text-amber-500 border border-amber-500/30'
-                : 'bg-brand hover:bg-brand-hover text-white'
+                ? 'btn-secondary'
+                : status === 'pending' || status === 'banned'
+                  ? 'btn-secondary'
+                  : 'btn-primary'
             }`}
+            style={
+              status === 'pending'
+                ? {
+                    background: 'var(--color-warning-subtle)',
+                    color: 'var(--color-warning)',
+                    borderColor: 'var(--color-warning)',
+                  }
+                : undefined
+            }
           >
             {loading
-              ? '...'
+              ? '…'
               : status === 'pending'
-              ? 'Pending'
-              : status === 'banned'
-              ? 'Banned'
-              : isMember
-              ? 'Joined'
-              : 'Join'}
+                ? 'Pending'
+                : status === 'banned'
+                  ? 'Banned'
+                  : isMember
+                    ? 'Joined'
+                    : 'Join'}
           </button>
         </div>
 
         {/* Name & Private Indicator */}
-        <div className="flex items-center gap-1.5 mb-1">
-          <h3 className="font-semibold text-sm text-foreground group-hover:text-brand transition-colors truncate">
+        <div className="mb-1 flex items-center gap-1.5 pt-3">
+          <h3 className="truncate text-sm font-semibold text-foreground transition-colors group-hover:text-brand">
             {community.name}
           </h3>
           {community.is_private && (
-            <Lock className="w-3.5 h-3.5 text-muted shrink-0" />
+            <Lock className="h-3.5 w-3.5 shrink-0 text-muted" aria-label="Private community" />
           )}
         </div>
 
-        {/* Category */}
         {community.category && (
           <div className="mb-2">
             <Badge variant="default">{community.category}</Badge>
           </div>
         )}
 
-        {/* Description */}
         {community.description && (
-          <p className="text-xs text-muted line-clamp-2 mb-4">
-            {community.description}
-          </p>
+          <p className="mb-4 line-clamp-2 text-xs text-muted">{community.description}</p>
         )}
 
         {/* Footer: Member Count */}
-        <div className="mt-auto pt-3 border-t border-border flex items-center gap-1.5 text-xs text-muted">
-          <Users className="w-3.5 h-3.5" />
+        <div className="mt-auto flex items-center gap-1.5 border-t border-border pt-3 text-xs text-muted">
+          <Users className="h-3.5 w-3.5" aria-hidden="true" />
           <span>
             {memberCount} {memberCount === 1 ? 'member' : 'members'}
           </span>
         </div>
       </div>
-    </Link>
+    </article>
   )
 }

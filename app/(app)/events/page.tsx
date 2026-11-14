@@ -5,8 +5,13 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Events & Meetups | Micro Community',
+  title: 'Events & meetups',
   description: 'Explore upcoming platform events, meetups, and manage your RSVPs.',
+}
+
+/** Events that started more than 12h ago are no longer "upcoming". */
+function recentCutoff() {
+  return new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
 }
 
 export default async function EventsPage({
@@ -14,7 +19,8 @@ export default async function EventsPage({
 }: {
   searchParams: Promise<{ tab?: string }>
 }) {
-  const { tab = 'attending' } = await searchParams
+  const { tab } = await searchParams
+  const activeTab = tab === 'all' ? 'all' : 'attending'
   const supabase = await createClient()
 
   const {
@@ -27,7 +33,9 @@ export default async function EventsPage({
   const { data: rawEvents } = await supabase
     .from('events')
     .select('id, community_id, title, description, location, online_url, starts_at, ends_at, capacity, cover_url, is_cancelled')
+    .gte('starts_at', recentCutoff())
     .order('starts_at', { ascending: true })
+    .limit(60)
 
   const allEvents = (rawEvents ?? []) as EventData[]
   const eventIds = allEvents.map((e) => e.id)
@@ -91,65 +99,62 @@ export default async function EventsPage({
     (e) => e.userRsvp === 'going' || e.userRsvp === 'interested'
   )
 
-  const displayedEvents = tab === 'all' ? eventsWithMeta : attendingEvents
+  const displayedEvents = activeTab === 'all' ? eventsWithMeta : attendingEvents
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="page page-wide space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Events & RSVPs</h1>
-          <p className="text-sm text-muted">
-            Track upcoming meetups, workshops, and RSVP statuses across all your communities.
+          <h1 className="page-title">Events</h1>
+          <p className="page-subtitle">
+            Meetups, workshops and RSVPs across every community you belong to.
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-surface border border-border shrink-0 text-xs font-semibold">
+        <nav
+          aria-label="Event filter"
+          className="flex shrink-0 items-center gap-1 rounded-[var(--radius-lg)] border border-border bg-surface p-1"
+        >
           <Link
             href="/events?tab=attending"
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
-              tab === 'attending'
-                ? 'bg-brand text-white shadow-xs'
-                : 'text-muted hover:text-foreground'
-            }`}
+            aria-current={activeTab === 'attending' ? 'page' : undefined}
+            className={`tab ${activeTab === 'attending' ? 'tab-active' : ''}`}
           >
-            My RSVPs ({attendingEvents.length})
+            My RSVPs
+            <span className="text-muted">{attendingEvents.length}</span>
           </Link>
           <Link
             href="/events?tab=all"
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
-              tab === 'all'
-                ? 'bg-brand text-white shadow-xs'
-                : 'text-muted hover:text-foreground'
-            }`}
+            aria-current={activeTab === 'all' ? 'page' : undefined}
+            className={`tab ${activeTab === 'all' ? 'tab-active' : ''}`}
           >
-            All Events ({eventsWithMeta.length})
+            All events
+            <span className="text-muted">{eventsWithMeta.length}</span>
           </Link>
-        </div>
+        </nav>
       </div>
 
       {displayedEvents.length === 0 ? (
-        <div className="card p-12 text-center border border-border bg-surface">
-          <div className="text-4xl mb-3">📅</div>
-          <h3 className="text-base font-semibold text-foreground">
-            {tab === 'attending' ? 'No RSVPed events yet' : 'No upcoming events found'}
+        <div className="card px-6 py-16 text-center">
+          <div className="text-3xl" aria-hidden="true">
+            📅
+          </div>
+          <h3 className="mt-3 text-base font-semibold text-foreground">
+            {activeTab === 'attending' ? 'No RSVPs yet' : 'No upcoming events'}
           </h3>
-          <p className="text-sm text-muted mt-1 mb-4">
-            {tab === 'attending'
-              ? 'Browse all upcoming events and mark yourself as Going or Interested!'
-              : 'Join communities to participate in community meetups.'}
+          <p className="mt-1 text-sm text-muted">
+            {activeTab === 'attending'
+              ? 'Browse what is coming up and mark yourself as going or interested.'
+              : 'Join a community to take part in its meetups.'}
           </p>
-          {tab === 'attending' && (
-            <Link
-              href="/events?tab=all"
-              className="inline-flex px-4 py-2 rounded-lg text-sm font-medium bg-brand hover:bg-brand-hover text-white transition-colors"
-            >
-              Browse All Events
+          {activeTab === 'attending' && (
+            <Link href="/events?tab=all" className="btn btn-primary mt-5">
+              Browse all events
             </Link>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {displayedEvents.map((event) => (
             <EventCard
               key={event.id}

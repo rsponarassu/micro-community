@@ -4,7 +4,7 @@ import CommunityForm from './CommunityForm'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Create a Community | Micro Community',
+  title: 'Create a community',
   description: 'Start a new micro-community to gather people around shared ideas and discussions.',
 }
 
@@ -19,13 +19,13 @@ export default async function NewCommunityPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto py-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Create a New Community</h1>
-        <p className="text-sm text-muted mt-1">
-          Create a space for discussions, events, and collaborative posts.
+    <div className="page page-wide space-y-6">
+      <header>
+        <h1 className="page-title">Create a community</h1>
+        <p className="page-subtitle">
+          A space for discussions, events and collaborative posts.
         </p>
-      </div>
+      </header>
 
       <CommunityForm />
     </div>

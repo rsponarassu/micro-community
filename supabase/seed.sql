@@ -1,9 +1,7 @@
 -- =============================================================
 -- MICRO COMMUNITY — SEED DATA (Milestone 2)
 -- =============================================================
--- Run in Supabase SQL Editor after running schema.sql:
--- https://supabase.com/dashboard/project/mfgmaxoffhpsxzshobow/sql/new
---
+-- Run in Supabase SQL Editor (Dashboard → SQL Editor → New query) after schema.sql:
 -- This script inserts:
 --   • 6 Test users (auth.users + public.profiles)
 --   • 4 Communities (Tech, Business, Design, Fitness)

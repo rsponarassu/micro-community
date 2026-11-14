@@ -1,11 +1,11 @@
 'use client'
 
 import { useActionState, useState, useEffect } from 'react'
-import { completeOnboarding, type AuthFormState } from '@/app/actions/auth'
+import { updateProfile, type AuthFormState } from '@/app/actions/auth'
 import { createClient } from '@/lib/supabase/client'
 import Avatar from '@/app/components/ui/Avatar'
 import { toast } from 'sonner'
-import { Moon, Sun } from 'lucide-react'
+import { Moon, Sun, Upload } from 'lucide-react'
 
 interface SettingsFormProps {
   userId: string
@@ -16,6 +16,8 @@ interface SettingsFormProps {
   initialAvatarUrl: string
 }
 
+type Theme = 'light' | 'dark'
+
 export default function SettingsForm({
   userId,
   email,
@@ -25,7 +27,7 @@ export default function SettingsForm({
   initialAvatarUrl,
 }: SettingsFormProps) {
   const [state, formAction, isPending] = useActionState<AuthFormState, FormData>(
-    completeOnboarding,
+    updateProfile,
     undefined
   )
 
@@ -33,29 +35,46 @@ export default function SettingsForm({
   const [bio, setBio] = useState(initialBio)
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl)
   const [uploading, setUploading] = useState(false)
-  const [theme, setTheme] = useState<string>('light')
+
+  // Read the applied theme from the DOM (the inline head script owns it) so the
+  // selected state cannot disagree with what is actually rendered.
+  const [theme, setTheme] = useState<Theme | null>(null)
+  useEffect(() => {
+    const current = document.documentElement.dataset.theme
+    setTheme(current === 'dark' ? 'dark' : 'light')
+  }, [])
 
   useEffect(() => {
-    if (state?.message && !state.success) {
+    if (state?.success) {
+      toast.success(state.message ?? 'Saved.')
+    } else if (state?.message) {
       toast.error(state.message)
     } else if (state?.errors) {
-      const firstError = Object.values(state.errors)[0]?.[0]
+      const firstError = Object.values(state.errors).flat()[0]
       if (firstError) toast.error(firstError)
     }
   }, [state])
 
-  // Theme toggle
-  function handleThemeChange(newTheme: 'light' | 'dark') {
-    setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-    document.documentElement.setAttribute('data-theme', newTheme)
-    toast.success(`Theme switched to ${newTheme} mode`)
+  function handleThemeChange(next: Theme) {
+    setTheme(next)
+    document.documentElement.setAttribute('data-theme', next)
+    document.documentElement.style.colorScheme = next
+    try {
+      localStorage.setItem('theme', next)
+    } catch {
+      // Private mode — the theme still applies for this session.
+    }
+    toast.success(`${next === 'dark' ? 'Dark' : 'Light'} mode on`)
   }
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.')
+      return
+    }
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image must be under 5MB.')
       return
@@ -64,56 +83,59 @@ export default function SettingsForm({
     try {
       setUploading(true)
       const supabase = createClient()
-      const ext = file.name.split('.').pop()
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png'
       const path = `${userId}/${Date.now()}.${ext}`
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(path, file, { upsert: true })
+        .upload(path, file, { upsert: true, contentType: file.type })
 
       if (uploadError) throw uploadError
 
-      const { data: publicUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(path)
-
+      const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path)
       setAvatarUrl(publicUrlData.publicUrl)
-      toast.success('Avatar updated!')
+      toast.success('Photo uploaded — remember to save.')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Upload failed')
     } finally {
       setUploading(false)
+      e.target.value = ''
     }
   }
 
   return (
-    <div className="space-y-8 max-w-2xl">
-      {/* Profile Settings */}
-      <form action={formAction} className="card p-6 sm:p-8 border border-border bg-surface space-y-6">
-        <h2 className="text-lg font-bold text-foreground">Profile Information</h2>
+    <div className="max-w-2xl space-y-5">
+      {/* Profile */}
+      <form action={formAction} className="card space-y-5 p-5 sm:p-6">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Profile</h2>
+          <p className="hint mt-0.5">This is what other members see.</p>
+        </div>
 
-        {state?.message && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 text-sm">
+        {state?.message && !state.success && (
+          <p
+            role="alert"
+            className="rounded-[var(--radius-md)] border px-3 py-2 text-sm"
+            style={{
+              background: 'var(--color-danger-subtle)',
+              borderColor: 'var(--color-danger)',
+              color: 'var(--color-danger)',
+            }}
+          >
             {state.message}
-          </div>
+          </p>
         )}
 
-        <input type="hidden" name="username" value={initialUsername} />
         <input type="hidden" name="avatar_url" value={avatarUrl} />
 
         {/* Avatar */}
-        <div className="flex items-center gap-5 p-4 rounded-xl bg-surface-raised border border-border">
-          <Avatar
-            src={avatarUrl || null}
-            name={displayName || initialUsername}
-            size={64}
-          />
-          <div>
-            <label className="text-sm font-semibold text-foreground block mb-1">
-              Change Profile Photo
-            </label>
-            <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-surface text-xs font-semibold text-foreground hover:bg-surface-raised cursor-pointer transition-colors">
-              <span>{uploading ? 'Uploading...' : 'Choose File'}</span>
+        <div className="flex items-center gap-4 rounded-[var(--radius-md)] border border-border bg-surface-raised p-3">
+          <Avatar src={avatarUrl || null} name={displayName || initialUsername} size={56} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Profile photo</p>
+            <label className="btn btn-secondary btn-sm mt-1.5 cursor-pointer">
+              <Upload className="h-3.5 w-3.5" />
+              {uploading ? 'Uploading…' : 'Change photo'}
               <input
                 type="file"
                 accept="image/*"
@@ -125,103 +147,116 @@ export default function SettingsForm({
           </div>
         </div>
 
-        {/* Username (Read Only) */}
+        {/* Username (immutable) */}
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Username
+          <label htmlFor="username" className="label">
+            Handle
           </label>
           <input
+            id="username"
             type="text"
             disabled
             value={`@${initialUsername}`}
-            className="w-full px-3.5 py-2.5 rounded-lg bg-surface-raised border border-border text-muted text-sm cursor-not-allowed"
+            className="field"
           />
-          <span className="text-[11px] text-muted mt-1 block">
-            Handles cannot be changed once established.
-          </span>
+          <p className="hint mt-1">Handles are permanent — they anchor your profile URL.</p>
         </div>
 
-        {/* Display Name */}
+        {/* Display name */}
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
-            Display Name <span className="text-red-500">*</span>
+          <label htmlFor="display_name" className="label">
+            Display name
           </label>
           <input
+            id="display_name"
             name="display_name"
             type="text"
             required
+            maxLength={50}
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg bg-surface-raised border border-border text-foreground text-sm focus:ring-2 focus:ring-brand focus:outline-hidden"
+            className="field"
           />
         </div>
 
         {/* Bio */}
         <div>
-          <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
+          <label htmlFor="bio" className="label">
             Bio
           </label>
           <textarea
+            id="bio"
             name="bio"
             rows={3}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             maxLength={200}
-            className="w-full px-3.5 py-2.5 rounded-lg bg-surface-raised border border-border text-foreground text-sm focus:ring-2 focus:ring-brand focus:outline-hidden resize-none"
+            className="field resize-none"
+            placeholder="A sentence or two about you."
           />
-          <div className="flex justify-end text-xs text-muted mt-1">
-            {bio.length}/200
+          <div className="mt-1 flex justify-end">
+            <span className={`hint ${bio.length > 180 ? 'text-warning' : ''}`}>
+              {bio.length}/200
+            </span>
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={isPending || uploading}
-          className="px-5 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-white text-sm font-semibold transition-colors disabled:opacity-60"
-        >
-          {isPending ? 'Saving...' : 'Save Profile Changes'}
-        </button>
+        <div className="border-t border-border pt-4">
+          <button
+            type="submit"
+            disabled={isPending || uploading}
+            className="btn btn-primary"
+          >
+            {isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
       </form>
 
-      {/* Theme Preference Card */}
-      <div className="card p-6 sm:p-8 border border-border bg-surface space-y-4">
-        <h2 className="text-lg font-bold text-foreground">Theme & Appearance</h2>
-        <p className="text-xs text-muted">
-          Customize your visual interface mode across sessions.
-        </p>
+      {/* Appearance */}
+      <div className="card space-y-3 p-5 sm:p-6">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">Appearance</h2>
+          <p className="hint mt-0.5">Applies instantly and is remembered on this device.</p>
+        </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => handleThemeChange('light')}
-            className={`p-3.5 rounded-xl border flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
-              theme === 'light'
-                ? 'border-brand bg-brand/10 text-brand'
-                : 'border-border bg-surface-raised text-foreground hover:bg-surface'
-            }`}
-          >
-            <Sun className="w-4 h-4" /> Light Mode
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleThemeChange('dark')}
-            className={`p-3.5 rounded-xl border flex items-center justify-center gap-2 text-sm font-semibold transition-all ${
-              theme === 'dark'
-                ? 'border-brand bg-brand/10 text-brand'
-                : 'border-border bg-surface-raised text-foreground hover:bg-surface'
-            }`}
-          >
-            <Moon className="w-4 h-4" /> Dark Mode
-          </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          {(
+            [
+              { value: 'light', label: 'Light', Icon: Sun },
+              { value: 'dark', label: 'Dark', Icon: Moon },
+            ] as const
+          ).map(({ value, label, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => handleThemeChange(value)}
+              aria-pressed={theme === value}
+              className={`flex items-center justify-center gap-2 rounded-[var(--radius-md)] border px-3 py-2.5 text-sm font-medium transition-colors ${
+                theme === value
+                  ? 'border-brand bg-brand-subtle text-brand'
+                  : 'border-border bg-surface text-text-secondary hover:bg-surface-overlay'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Account Info Card */}
-      <div className="card p-6 border border-border bg-surface space-y-2 text-xs text-muted">
-        <h2 className="text-sm font-bold text-foreground mb-1">Account & Security</h2>
-        <p><strong>Signed in as:</strong> {email}</p>
-        <p><strong>User ID:</strong> <span className="font-mono">{userId}</span></p>
+      {/* Account */}
+      <div className="card space-y-1.5 p-5 sm:p-6">
+        <h2 className="text-base font-semibold text-foreground">Account</h2>
+        <dl className="space-y-1 text-xs text-muted">
+          <div className="flex justify-between gap-3">
+            <dt>Email</dt>
+            <dd className="truncate text-text-secondary">{email}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt>User ID</dt>
+            <dd className="truncate font-mono text-text-secondary">{userId}</dd>
+          </div>
+        </dl>
       </div>
     </div>
   )

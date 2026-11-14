@@ -2,23 +2,35 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/auth/callback']
+/** Reachable without a session. `/reset-password` is included because the
+ *  recovery link establishes its session through `/auth/callback`. */
+const PUBLIC_ROUTES = [
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/reset-password',
+  '/auth/callback',
+]
+
+/** Signed-in members should not see these. */
+const GUEST_ONLY_ROUTES = ['/login', '/signup', '/forgot-password']
+
+/** Real static assets. The old check was `pathname.includes('.')`, which let
+ *  ` /c/some.thing ` skip authentication entirely. */
+const STATIC_FILE = /\.(?:avif|css|gif|ico|jpe?g|js|json|map|png|svg|txt|webp|woff2?|ttf)$/i
+
+function matchesRoute(pathname: string, routes: string[]) {
+  return routes.some((route) => pathname === route || pathname.startsWith(`${route}/`))
+}
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, search } = request.nextUrl
 
-  // Allow public assets and API routes
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.includes('.')
-  ) {
+  if (pathname.startsWith('/_next') || pathname.startsWith('/api') || STATIC_FILE.test(pathname)) {
     return NextResponse.next()
   }
 
-  let response = NextResponse.next({
-    request,
-  })
+  let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,9 +41,7 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           response = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
@@ -45,17 +55,14 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
-
-  // Redirect unauthenticated users to login
-  if (!user && !isPublicPath) {
+  if (!user && !matchesRoute(pathname, PUBLIC_ROUTES)) {
     const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('next', pathname)
+    // Preserve the query string so deep links survive the round-trip.
+    loginUrl.searchParams.set('next', `${pathname}${search}`)
     return NextResponse.redirect(loginUrl)
   }
 
-  // Redirect authenticated users away from auth pages
-  if (user && isPublicPath) {
+  if (user && matchesRoute(pathname, GUEST_ONLY_ROUTES)) {
     return NextResponse.redirect(new URL('/', request.url))
   }
 

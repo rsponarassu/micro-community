@@ -4,7 +4,7 @@ import SettingsForm from './SettingsForm'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Settings | Micro Community',
+  title: 'Settings',
   description: 'Manage your profile, bio, avatar, and appearance.',
 }
 
@@ -30,14 +30,17 @@ export default async function SettingsPage() {
     avatar_url: string | null
   } | null
 
+  // A signed-in user without a handle has not finished onboarding yet.
+  if (!profile?.username) redirect('/onboarding')
+
   return (
-    <div className="max-w-4xl mx-auto py-2 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Account Settings</h1>
-        <p className="text-sm text-muted mt-0.5">
-          Update your public profile, avatar, and application appearance.
+    <div className="page space-y-5">
+      <header>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">
+          Update your public profile, avatar, and appearance.
         </p>
-      </div>
+      </header>
 
       <SettingsForm
         userId={user.id}

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Avatar from '@/app/components/ui/Avatar'
 import PostCard, { type PostPublicData } from '@/app/components/PostCard'
 import { formatDate } from '@/lib/utils'
+import { loadPostMeta } from '@/lib/feed'
 import { Calendar, Settings } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -16,7 +17,7 @@ export async function generateMetadata({
 }: ProfilePageProps): Promise<Metadata> {
   const { username } = await params
   return {
-    title: `@${username} | Micro Community`,
+    title: `@${username}`,
     description: `View profile and community posts by @${username}`,
   }
 }
@@ -79,58 +80,80 @@ export default async function UserProfilePage({ params }: ProfilePageProps) {
 
   const posts = (rawPosts ?? []) as PostPublicData[]
 
+  // Post cards need the parent community and engagement counters to render
+  // links and reaction state; fetch both in one pass.
+  const postCommunityIds = Array.from(new Set(posts.map((p) => p.community_id)))
+  const [postCommsRes, meta] = await Promise.all([
+    postCommunityIds.length > 0
+      ? supabase.from('communities').select('id, name, slug').in('id', postCommunityIds)
+      : Promise.resolve({ data: [] }),
+    loadPostMeta(supabase, posts.map((p) => p.id), currentUser?.id),
+  ])
+
+  const commById = new Map(
+    ((postCommsRes.data ?? []) as { id: string; name: string; slug: string }[]).map((c) => [
+      c.id,
+      c,
+    ])
+  )
+
+  const enrichedPosts = posts.map((p) => ({
+    ...p,
+    community_slug: commById.get(p.community_id)?.slug,
+    community_name: commById.get(p.community_id)?.name,
+    reactions: meta.reactions[p.id] ?? [],
+    commentCount: meta.commentCounts[p.id] ?? 0,
+  }))
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8 py-4">
+    <div className="page page-wide space-y-6">
       {/* Profile Header Card */}
-      <div className="card p-6 sm:p-8 border border-border bg-surface shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
+      <div className="card p-5 sm:p-7">
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-4">
             <Avatar
               src={profile.avatar_url}
               name={profile.display_name || profile.username}
               size={72}
             />
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-bold text-foreground sm:text-2xl">
                 {profile.display_name || profile.username}
               </h1>
               <p className="text-sm text-muted">@{profile.username}</p>
-              <div className="flex items-center gap-1.5 text-xs text-muted mt-2">
-                <Calendar className="w-3.5 h-3.5" />
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted">
+                <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>Joined {formatDate(profile.created_at)}</span>
               </div>
             </div>
           </div>
 
           {isOwnProfile && (
-            <Link
-              href="/settings"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-surface-raised hover:bg-surface text-sm font-semibold text-foreground transition-colors shrink-0"
-            >
-              <Settings className="w-4 h-4 text-muted" />
-              <span>Edit Profile</span>
+            <Link href="/settings" className="btn btn-secondary shrink-0">
+              <Settings className="h-4 w-4" />
+              Edit profile
             </Link>
           )}
         </div>
 
         {profile.bio && (
-          <p className="text-sm text-foreground/90 mt-5 pt-5 border-t border-border leading-relaxed">
+          <p className="mt-5 border-t border-border pt-5 text-sm leading-relaxed text-text-secondary">
             {profile.bio}
           </p>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Left 2 cols: User's Public Posts */}
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-lg font-bold text-foreground">Public Posts</h2>
-          {posts.length === 0 ? (
-            <div className="card p-8 border border-border bg-surface text-center text-sm text-muted">
-              No public posts shared yet.
+        <section className="space-y-3 lg:col-span-2">
+          <h2 className="eyebrow">Public posts</h2>
+          {enrichedPosts.length === 0 ? (
+            <div className="card px-6 py-10 text-center text-sm text-muted">
+              No public posts yet.
             </div>
           ) : (
-            <div className="space-y-4">
-              {posts.map((post) => (
+            <div className="space-y-3">
+              {enrichedPosts.map((post) => (
                 <PostCard
                   key={post.id}
                   post={post}
@@ -139,39 +162,36 @@ export default async function UserProfilePage({ params }: ProfilePageProps) {
               ))}
             </div>
           )}
-        </div>
+        </section>
 
         {/* Right col: Communities List */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold text-foreground">
-            Communities ({communities.length})
-          </h2>
+        <section className="space-y-3">
+          <h2 className="eyebrow">Communities · {communities.length}</h2>
           {communities.length === 0 ? (
-            <div className="card p-6 border border-border bg-surface text-center text-xs text-muted">
+            <div className="card px-5 py-8 text-center text-xs text-muted">
               Not a member of any communities yet.
             </div>
           ) : (
-            <div className="card p-3 border border-border bg-surface space-y-1">
+            <div className="card space-y-0.5 p-2">
               {communities.map((c) => (
                 <Link
                   key={c.id}
                   href={`/c/${c.slug}`}
-                  className="flex items-center justify-between p-2.5 rounded-lg hover:bg-surface-raised transition-colors group"
+                  className="group flex items-center justify-between gap-2 rounded-[var(--radius-md)] px-2.5 py-2 transition-colors hover:bg-surface-overlay"
                 >
                   <div className="min-w-0">
-                    <div className="font-semibold text-sm text-foreground group-hover:text-brand transition-colors truncate">
+                    <div className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-brand">
                       {c.name}
                     </div>
                     {c.category && (
                       <span className="text-[11px] text-muted">{c.category}</span>
                     )}
                   </div>
-                  <span className="text-xs text-muted font-mono">/c/{c.slug}</span>
                 </Link>
               ))}
             </div>
           )}
-        </div>
+        </section>
       </div>
     </div>
   )

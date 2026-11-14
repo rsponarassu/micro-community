@@ -74,47 +74,95 @@ export async function createPost(
     return { message: error.message }
   }
 
-  revalidatePath('/', 'layout')
+  // Revalidate only the views this post can appear in. `revalidatePath('/','layout')`
+  // used to wipe the whole route cache on every write.
+  await revalidatePostSurfaces(supabase, parsed.data.community_id)
   return { success: true }
+}
+
+/** Clears just the feed surfaces a post belongs to. */
+async function revalidatePostSurfaces(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  communityId: string
+) {
+  const { data } = await supabase
+    .from('communities')
+    .select('slug')
+    .eq('id', communityId)
+    .single()
+
+  revalidatePath('/')
+  if (data?.slug) revalidatePath(`/c/${data.slug}`)
 }
 
 export async function deletePost(postId: string) {
   const supabase = await createClient()
-  const { error } = await supabase.rpc('delete_own_post', { p_post_id: postId })
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  if (error) {
-    // If not own post, check if moderator/owner and delete via base table
-    const { error: directError } = await supabase
+  if (!user) throw new Error('You must be signed in.')
+
+  const { error: rpcError } = await supabase.rpc('delete_own_post', { p_post_id: postId })
+
+  if (rpcError) {
+    // Not the author. Fall back to a moderator delete only after confirming the
+    // role here — the previous code deleted unconditionally and hid RPC failures.
+    const { data: post } = await supabase
       .from('posts')
-      .delete()
+      .select('community_id')
       .eq('id', postId)
+      .single()
 
-    if (directError) throw new Error(directError.message)
+    if (!post) throw new Error('Post not found.')
+
+    const { data: membership } = await supabase
+      .from('community_members')
+      .select('role')
+      .eq('community_id', post.community_id)
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .single()
+
+    const role = (membership as { role?: string } | null)?.role
+    if (role !== 'owner' && role !== 'moderator') {
+      throw new Error('You do not have permission to delete this post.')
+    }
+
+    const { error: moderatorError } = await supabase.from('posts').delete().eq('id', postId)
+    if (moderatorError) throw new Error(moderatorError.message)
+
+    await revalidatePostSurfaces(supabase, post.community_id)
+    return
   }
 
-  revalidatePath('/', 'layout')
+  revalidatePath('/')
 }
 
 export async function togglePostPin(postId: string, currentPinned: boolean) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('posts')
     .update({ is_pinned: !currentPinned })
     .eq('id', postId)
+    .select('community_id')
+    .single()
 
   if (error) throw new Error(error.message)
-  revalidatePath('/', 'layout')
+  if (data?.community_id) await revalidatePostSurfaces(supabase, data.community_id)
 }
 
 export async function togglePostHide(postId: string, currentHidden: boolean) {
   const supabase = await createClient()
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('posts')
     .update({ is_hidden: !currentHidden })
     .eq('id', postId)
+    .select('community_id')
+    .single()
 
   if (error) throw new Error(error.message)
-  revalidatePath('/', 'layout')
+  if (data?.community_id) await revalidatePostSurfaces(supabase, data.community_id)
 }
 
 export async function toggleReaction(postId: string, type: string) {
@@ -125,5 +173,6 @@ export async function toggleReaction(postId: string, type: string) {
   })
 
   if (error) throw new Error(error.message)
-  revalidatePath('/', 'layout')
+  // No revalidation on purpose: ReactionBar keeps its own optimistic state and
+  // re-syncs from props, so purging the cache per tap was pure overhead.
 }

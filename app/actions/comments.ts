@@ -23,6 +23,32 @@ export type CommentFormState =
     }
   | undefined
 
+/** Clears only the discussion surfaces touched by a comment. */
+async function revalidateDiscussion(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  postId: string
+) {
+  const { data: post } = await supabase
+    .from('posts')
+    .select('community_id')
+    .eq('id', postId)
+    .single()
+
+  revalidatePath('/')
+  if (!post?.community_id) return
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('slug')
+    .eq('id', post.community_id)
+    .single()
+
+  if (community?.slug) {
+    revalidatePath(`/c/${community.slug}`)
+    revalidatePath(`/c/${community.slug}/post/${postId}`)
+  }
+}
+
 export async function createComment(
   _prevState: CommentFormState,
   formData: FormData
@@ -73,20 +99,26 @@ export async function createComment(
     return { message: error.message }
   }
 
-  revalidatePath('/', 'layout')
+  await revalidateDiscussion(supabase, parsed.data.post_id)
   return { success: true }
 }
 
 export async function deleteComment(commentId: string) {
   const supabase = await createClient()
-  const { error } = await supabase
+
+  // Remember the parent post so the right pages can be revalidated after delete.
+  const { data: comment } = await supabase
     .from('comments')
-    .delete()
+    .select('post_id')
     .eq('id', commentId)
+    .single()
+
+  const { error } = await supabase.from('comments').delete().eq('id', commentId)
 
   if (error) {
     throw new Error(error.message)
   }
 
-  revalidatePath('/', 'layout')
+  if (comment?.post_id) await revalidateDiscussion(supabase, comment.post_id)
+  else revalidatePath('/')
 }

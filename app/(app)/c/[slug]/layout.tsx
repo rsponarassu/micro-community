@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
-import Link from 'next/link'
 import { Users, Lock } from 'lucide-react'
 import CommunityHeaderActions from './CommunityHeaderActions'
+import CommunityTabs from './CommunityTabs'
 
 interface CommunityLayoutProps {
   children: React.ReactNode
@@ -70,62 +70,61 @@ export default async function CommunityLayout({
   const isModOrOwner = userMembership?.status === 'active' && (userMembership.role === 'owner' || userMembership.role === 'moderator')
 
   return (
-    <div className="space-y-6">
+    <div className="page page-wide space-y-5">
       {/* Banner & Header */}
-      <div className="card overflow-hidden border border-border bg-surface">
-        <div className="h-40 sm:h-52 w-full relative bg-surface-raised overflow-hidden">
+      <div className="card overflow-hidden">
+        <div className="relative h-32 w-full overflow-hidden bg-surface-raised sm:h-44">
           {community.cover_url ? (
             <Image
               src={community.cover_url}
-              alt={community.name}
+              alt=""
               fill
+              sizes="(max-width: 1024px) 100vw, 900px"
+              priority
               className="object-cover"
-              unoptimized
             />
           ) : (
-            <div className="w-full h-full bg-linear-to-r from-brand/20 via-purple-500/20 to-pink-500/10" />
+            <div className="h-full w-full bg-linear-to-r from-brand/25 via-accent/20 to-brand/10" />
           )}
+          <div className="absolute inset-0 bg-linear-to-t from-black/25 to-transparent" />
         </div>
 
-        <div className="p-5 sm:p-6 pt-0 relative">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-10 sm:-mt-12 mb-4">
-            <div className="flex items-end gap-4">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border-4 border-surface bg-surface-raised overflow-hidden flex items-center justify-center font-bold text-2xl text-foreground shadow-md shrink-0">
+        <div className="relative p-4 pt-0 sm:p-5 sm:pt-0">
+          <div className="-mt-9 mb-3 flex flex-col justify-between gap-3 sm:-mt-10 sm:flex-row sm:items-end">
+            <div className="flex items-end gap-3">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-lg)] border-4 border-surface bg-surface-raised text-2xl font-bold text-foreground shadow-md sm:h-20 sm:w-20">
                 {community.icon_url ? (
                   <Image
                     src={community.icon_url}
-                    alt={community.name}
-                    width={96}
-                    height={96}
-                    className="w-full h-full object-cover"
-                    unoptimized
+                    alt={`${community.name} logo`}
+                    width={80}
+                    height={80}
+                    className="h-full w-full object-cover"
                   />
                 ) : (
                   <span>{community.name[0].toUpperCase()}</span>
                 )}
               </div>
-              <div className="mb-1">
+
+              <div className="mb-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">
+                  <h1 className="truncate text-xl font-bold text-foreground sm:text-2xl">
                     {community.name}
                   </h1>
                   {community.is_private && (
-                    <span title="Private community">
-                      <Lock className="w-4 h-4 text-muted" />
-                    </span>
+                    <Lock className="h-4 w-4 shrink-0 text-muted" aria-label="Private community" />
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted mt-1">
-                  <span>/c/{community.slug}</span>
+
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
                   {community.category && (
                     <>
-                      <span>•</span>
                       <span>{community.category}</span>
+                      <span aria-hidden="true">·</span>
                     </>
                   )}
-                  <span>•</span>
                   <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" />
+                    <Users className="h-3.5 w-3.5" aria-hidden="true" />
                     {memberCount ?? 0} {memberCount === 1 ? 'member' : 'members'}
                   </span>
                 </div>
@@ -141,46 +140,12 @@ export default async function CommunityLayout({
           </div>
 
           {community.description && (
-            <p className="text-sm text-foreground/80 max-w-3xl mb-4">
+            <p className="prose-content mb-3 max-w-3xl text-sm text-text-secondary">
               {community.description}
             </p>
           )}
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-1 border-t border-border pt-3 overflow-x-auto">
-            <Link
-              href={`/c/${community.slug}`}
-              className="px-3.5 py-1.5 rounded-lg text-sm font-medium hover:bg-surface-raised transition-colors text-foreground"
-            >
-              Feed
-            </Link>
-            <Link
-              href={`/c/${community.slug}/events`}
-              className="px-3.5 py-1.5 rounded-lg text-sm font-medium hover:bg-surface-raised transition-colors text-foreground"
-            >
-              Events
-            </Link>
-            <Link
-              href={`/c/${community.slug}/members`}
-              className="px-3.5 py-1.5 rounded-lg text-sm font-medium hover:bg-surface-raised transition-colors text-foreground"
-            >
-              Members
-            </Link>
-            <Link
-              href={`/c/${community.slug}/about`}
-              className="px-3.5 py-1.5 rounded-lg text-sm font-medium hover:bg-surface-raised transition-colors text-foreground"
-            >
-              About
-            </Link>
-            {isModOrOwner && (
-              <Link
-                href={`/c/${community.slug}/admin`}
-                className="px-3.5 py-1.5 rounded-lg text-sm font-medium text-brand hover:bg-brand/10 transition-colors ml-auto"
-              >
-                ⚙️ Admin
-              </Link>
-            )}
-          </div>
+          <CommunityTabs slug={community.slug} canAdmin={isModOrOwner} />
         </div>
       </div>
 

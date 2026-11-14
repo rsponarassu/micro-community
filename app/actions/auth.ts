@@ -43,6 +43,8 @@ const OnboardingSchema = z.object({
   avatar_url: z.string().url('Invalid avatar URL').optional().or(z.literal('')),
 })
 
+const UpdateProfileSchema = OnboardingSchema.omit({ username: true })
+
 export type AuthFormState =
   | {
       errors?: Record<string, string[]>
@@ -50,6 +52,19 @@ export type AuthFormState =
       success?: boolean
     }
   | undefined
+
+/**
+ * Open-redirect guard. Only same-origin, single-slash paths survive; anything
+ * like `//evil.com`, `/\evil.com` or `https://evil.com` falls back to `fallback`.
+ */
+function safeNext(value: unknown, fallback = '/'): string {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (!raw.startsWith('/')) return fallback
+  if (raw.startsWith('//') || raw.startsWith('/\\')) return fallback
+  // Reject scheme-looking prefixes that browsers may still resolve cross-origin.
+  if (/^\/[a-z][a-z0-9+.-]*:/i.test(raw)) return fallback
+  return raw
+}
 
 export async function signIn(
   _prevState: AuthFormState,
@@ -72,7 +87,7 @@ export async function signIn(
   }
 
   revalidatePath('/', 'layout')
-  const next = formData.get('next')?.toString() || '/'
+  const next = safeNext(formData.get('next'))
   const redirectUrl = next.includes('?') ? `${next}&toast=logged_in` : `${next}?toast=logged_in`
   redirect(redirectUrl)
 }
@@ -175,6 +190,8 @@ export async function completeOnboarding(
   const parsed = OnboardingSchema.safeParse({
     username: formData.get('username'),
     display_name: formData.get('display_name'),
+    bio: formData.get('bio') ?? '',
+    avatar_url: formData.get('avatar_url') ?? '',
   })
 
   if (!parsed.success) {
@@ -216,4 +233,53 @@ export async function completeOnboarding(
 
   revalidatePath('/', 'layout')
   redirect('/?toast=profile_completed')
+}
+
+/**
+ * Saves the account-settings form. Kept separate from `completeOnboarding`
+ * because that action ends in a redirect — saving settings must stay on the
+ * page and report success inline instead of bouncing the user to the feed.
+ */
+export async function updateProfile(
+  _prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const parsed = UpdateProfileSchema.safeParse({
+    display_name: formData.get('display_name'),
+    bio: formData.get('bio') ?? '',
+    avatar_url: formData.get('avatar_url') ?? '',
+  })
+
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { message: 'You must be signed in.' }
+  }
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      display_name: parsed.data.display_name,
+      bio: parsed.data.bio || null,
+      avatar_url: parsed.data.avatar_url || null,
+    })
+    .eq('id', user.id)
+    .select('username')
+    .single()
+
+  if (error) {
+    return { message: error.message }
+  }
+
+  revalidatePath('/settings')
+  if (data?.username) revalidatePath(`/u/${data.username}`)
+
+  return { success: true, message: 'Profile updated.' }
 }

@@ -1,7 +1,7 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
-import { Toaster } from 'sonner'
 import NotificationListener from '@/app/components/layout/NotificationListener'
+import ToastProvider from '@/app/components/layout/ToastProvider'
 import './globals.css'
 
 const inter = Inter({
@@ -29,6 +29,20 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0e0e11' },
+  ],
+  colorScheme: 'light dark',
+}
+
+/**
+ * Applies the stored theme before first paint so the UI never flashes light
+ * mode. Must stay inline + synchronous in <head>.
+ */
+const THEME_BOOTSTRAP = `(function(){try{var s=localStorage.getItem('theme');var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');var r=document.documentElement;r.setAttribute('data-theme',t);r.style.colorScheme=t;}catch(e){}})();`
+
 export default function RootLayout({
   children,
 }: {
@@ -36,19 +50,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head />
-      <body className={`${inter.variable} min-h-dvh antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+      </head>
+      <body className={inter.variable}>
         {children}
         <NotificationListener />
-        <Toaster
-          position="top-center"
-          richColors
-          closeButton
-          toastOptions={{
-            duration: 4000,
-            className: 'top-notification-pill',
-          }}
-        />
+        <ToastProvider />
       </body>
     </html>
   )

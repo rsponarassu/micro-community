@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
 export default function Error({
@@ -9,23 +10,27 @@ export default function Error({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    // Surface the real cause in the console; the UI stays human-readable.
+    console.error(error)
+  }, [error])
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] text-center px-4">
-      <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-        style={{ background: 'hsl(0 84% 95%)' }}>
-        <AlertTriangle size={28} style={{ color: 'var(--color-error)' }} />
+    <div className="flex min-h-[50vh] flex-col items-center justify-center px-4 text-center">
+      <div
+        className="mb-4 flex h-14 w-14 items-center justify-center rounded-full"
+        style={{ background: 'var(--color-danger-subtle)' }}
+      >
+        <AlertTriangle size={26} style={{ color: 'var(--color-danger)' }} aria-hidden="true" />
       </div>
-      <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>
-        Something went wrong
-      </h2>
-      <p className="text-sm mb-6 max-w-sm" style={{ color: 'var(--color-text-muted)' }}>
+
+      <h2 className="text-lg font-bold text-foreground">Something went wrong</h2>
+      <p className="mt-1.5 max-w-sm text-sm text-muted">
         {error.message || 'An unexpected error occurred. Please try again.'}
       </p>
-      <button
-        onClick={reset}
-        className="px-4 py-2 rounded-lg text-sm font-medium text-white"
-        style={{ background: 'var(--color-brand)' }}
-      >
+      {error.digest && <p className="hint mt-1 font-mono">ref {error.digest}</p>}
+
+      <button type="button" onClick={reset} className="btn btn-primary mt-6">
         Try again
       </button>
     </div>

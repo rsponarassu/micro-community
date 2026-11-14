@@ -12,6 +12,12 @@ export const metadata: Metadata = {
 
 const CATEGORIES = ['All', 'Academic', 'Social', 'Sports', 'Arts', 'Tech', 'Other']
 
+/** `%` and `_` are ILIKE wildcards — letting them through turns a search
+ *  for "_" into "match everything" and wrecks the result set. */
+function escapeLike(value: string) {
+  return value.replace(/[%_\\]/g, (ch) => `\\${ch}`)
+}
+
 type CommunityRow = {
   id: string
   name: string
@@ -31,6 +37,8 @@ export default async function DiscoverPage({
 }) {
   const { q, category } = await searchParams
   const supabase = await createClient()
+  const searchTerm = q?.trim() ?? ''
+  const activeCategory = category && CATEGORIES.includes(category) ? category : 'All'
 
   let query = supabase
     .from('communities')
@@ -38,11 +46,11 @@ export default async function DiscoverPage({
     .order('created_at', { ascending: false })
     .limit(40)
 
-  if (q) {
-    query = query.ilike('name', `%${q}%`)
+  if (searchTerm) {
+    query = query.ilike('name', `%${escapeLike(searchTerm)}%`)
   }
-  if (category && category !== 'All') {
-    query = query.eq('category', category)
+  if (activeCategory !== 'All') {
+    query = query.eq('category', activeCategory)
   }
 
   const { data: rawCommunities, error } = await query
@@ -88,86 +96,105 @@ export default async function DiscoverPage({
     }
   }
 
+  const buildCategoryHref = (value: string) => {
+    const params = new URLSearchParams()
+    if (searchTerm) params.set('q', searchTerm)
+    if (value !== 'All') params.set('category', value)
+    const qs = params.toString()
+    return qs ? `/discover?${qs}` : '/discover'
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="page page-wide space-y-6">
       {/* Video Hero Spotlight Banner */}
-      {!q && (!category || category === 'All') && (
+      {!searchTerm && activeCategory === 'All' && (
         <ScrollReveal animation="fade-down" duration={700}>
           <VideoHero />
         </ScrollReveal>
       )}
 
       <ScrollReveal animation="fade-up" delay={100}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+        <div className="mb-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Discover Communities
-            </h1>
-            <p className="text-sm text-muted">
-              Find and join focused groups that match your interests
+            <h1 className="page-title">Discover</h1>
+            <p className="page-subtitle">
+              Find and join focused groups that match your interests.
             </p>
           </div>
-          <Link
-            href="/c/new"
-            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-semibold bg-brand hover:bg-brand-hover text-white transition-all shadow-md shadow-brand/20 active:scale-95 shrink-0"
-          >
-            + Create Community
+          <Link href="/c/new" className="btn btn-primary shrink-0">
+            Create community
           </Link>
         </div>
       </ScrollReveal>
 
-      {/* Search + filter */}
+      {/* Search + category filters */}
       <ScrollReveal animation="fade-up" delay={150}>
-        <form method="GET" className="flex flex-col sm:flex-row gap-3">
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Search communities…"
-            className="flex-1 px-4 py-2.5 rounded-xl text-sm bg-surface border border-border text-foreground placeholder:text-muted focus:ring-2 focus:ring-brand focus:outline-hidden transition-all shadow-xs"
-          />
-          <select
-            name="category"
-            defaultValue={category ?? 'All'}
-            className="px-4 py-2.5 rounded-xl text-sm bg-surface border border-border text-foreground focus:ring-2 focus:ring-brand focus:outline-hidden transition-all shadow-xs"
-          >
+        <div className="space-y-3">
+          <form method="GET" role="search" className="flex gap-2">
+            <input
+              name="q"
+              defaultValue={searchTerm}
+              placeholder="Search communities…"
+              aria-label="Search communities"
+              className="field flex-1"
+            />
+            {activeCategory !== 'All' && (
+              <input type="hidden" name="category" value={activeCategory} />
+            )}
+            <button type="submit" className="btn btn-secondary">
+              Search
+            </button>
+          </form>
+
+          <nav aria-label="Filter by category" className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
             {CATEGORIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+              <Link
+                key={c}
+                href={buildCategoryHref(c)}
+                aria-current={activeCategory === c ? 'page' : undefined}
+                className={`chip ${activeCategory === c ? 'chip-active' : ''}`}
+              >
+                {c}
+              </Link>
             ))}
-          </select>
-          <button
-            type="submit"
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand hover:bg-brand-hover transition-all shadow-xs active:scale-95"
-          >
-            Search
-          </button>
-        </form>
+          </nav>
+        </div>
       </ScrollReveal>
 
       {error && (
-        <div className="p-4 rounded-xl text-sm bg-red-500/10 border border-red-500/20 text-red-500">
-          Failed to load communities. Please try again.
+        <div
+          role="alert"
+          className="rounded-[var(--radius-md)] border px-4 py-3 text-sm"
+          style={{
+            background: 'var(--color-danger-subtle)',
+            borderColor: 'var(--color-danger)',
+            color: 'var(--color-danger)',
+          }}
+        >
+          We couldn&apos;t load communities right now. Please refresh and try again.
         </div>
       )}
 
       {!communities?.length && !error && (
-        <div className="text-center py-16 card p-8 border border-border">
-          <div className="text-4xl mb-3">🏘️</div>
-          <h2 className="text-lg font-semibold mb-1 text-foreground">
-            No communities found
+        <div className="card px-6 py-16 text-center">
+          <div className="text-3xl" aria-hidden="true">
+            🏘️
+          </div>
+          <h2 className="mt-3 text-base font-semibold text-foreground">
+            {searchTerm ? 'No communities match that search' : 'No communities yet'}
           </h2>
-          <p className="text-sm text-muted mb-4">
-            {q ? `No results matching "${q}"` : 'Be the first to create one!'}
+          <p className="mt-1 text-sm text-muted">
+            {searchTerm
+              ? `Nothing found for “${searchTerm}”. Try a broader term.`
+              : 'Be the first to start one and invite your people.'}
           </p>
-          <Link
-            href="/c/new"
-            className="inline-flex px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand hover:bg-brand-hover transition-all"
-          >
-            Create Community
+          <Link href="/c/new" className="btn btn-primary mt-5">
+            Create community
           </Link>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {(communities ?? []).map((c, idx) => {
           const mStatus = userMemberships[c.id]
           return (

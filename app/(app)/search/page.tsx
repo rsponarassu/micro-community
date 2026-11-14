@@ -5,9 +5,10 @@ import PostCard, { type PostPublicData } from '@/app/components/PostCard'
 import Avatar from '@/app/components/ui/Avatar'
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { loadPostMeta } from '@/lib/feed'
 
 export const metadata: Metadata = {
-  title: 'Search | Micro Community',
+  title: 'Search',
   description: 'Search across all communities, posts, and member profiles.',
 }
 
@@ -15,175 +16,225 @@ interface SearchPageProps {
   searchParams: Promise<{ q?: string; type?: string }>
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const { q = '', type = 'all' } = await searchParams
-  const supabase = await createClient()
+type SearchTab = 'all' | 'communities' | 'posts' | 'members'
+const TABS: SearchTab[] = ['all', 'communities', 'posts', 'members']
+const TAB_LABELS: Record<SearchTab, string> = {
+  all: 'All',
+  communities: 'Communities',
+  posts: 'Posts',
+  members: 'People',
+}
 
+/**
+ * PostgREST parses `.or()` as a mini expression, so commas, parentheses and
+ * wildcards inside raw user input break the filter — or worse, let a caller
+ * inject extra conditions. Strip them before interpolating.
+ */
+function toFilterTerm(input: string) {
+  return input.trim().replace(/[,()*:%\\"']/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const { q = '', type } = await searchParams
+  const activeTab: SearchTab = TABS.includes(type as SearchTab) ? (type as SearchTab) : 'all'
+
+  const rawTerm = q.trim()
+  const term = toFilterTerm(rawTerm)
+
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   let communities: CommunityCardData[] = []
   let posts: PostPublicData[] = []
-  let profiles: { id: string; username: string; display_name: string | null; avatar_url: string | null; bio: string | null }[] = []
+  let profiles: {
+    id: string
+    username: string
+    display_name: string | null
+    avatar_url: string | null
+    bio: string | null
+  }[] = []
 
-  if (q.trim()) {
-    // 1. Search Communities
-    if (type === 'all' || type === 'communities') {
-      const { data: rawComms } = await supabase
-        .from('communities')
-        .select('id, name, slug, description, category, icon_url, cover_url, is_private')
-        .or(`name.ilike.%${q}%,description.ilike.%${q}%`)
-        .limit(10)
+  if (term) {
+    const wantsCommunities = activeTab === 'all' || activeTab === 'communities'
+    const wantsPosts = activeTab === 'all' || activeTab === 'posts'
+    const wantsPeople = activeTab === 'all' || activeTab === 'members'
 
-      if (rawComms) {
-        communities = (rawComms as { id: string; name: string; slug: string; description: string | null; category: string | null; icon_url: string | null; cover_url: string | null; is_private: boolean }[]).map((c) => ({
-          ...c,
-          memberCount: 0,
-        }))
-      }
+    // All three lookups are independent — run them together instead of serially.
+    const [communitiesRes, postsRes, profilesRes] = await Promise.all([
+      wantsCommunities
+        ? supabase
+            .from('communities')
+            .select('id, name, slug, description, category, icon_url, cover_url, is_private')
+            .or(`name.ilike.%${term}%,description.ilike.%${term}%`)
+            .limit(10)
+        : Promise.resolve({ data: [] }),
+      wantsPosts
+        ? supabase
+            .from('posts_public')
+            .select(
+              'id, community_id, content, image_url, is_anonymous, is_pinned, created_at, author_id, author_username, author_display_name, author_avatar_url'
+            )
+            .ilike('content', `%${term}%`)
+            .order('created_at', { ascending: false })
+            .limit(15)
+        : Promise.resolve({ data: [] }),
+      wantsPeople
+        ? supabase
+            .from('profiles')
+            .select('id, username, display_name, avatar_url, bio')
+            .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
+            .limit(10)
+        : Promise.resolve({ data: [] }),
+    ])
+
+    if (communitiesRes.data) {
+      communities = (
+        communitiesRes.data as Omit<CommunityCardData, 'memberCount'>[]
+      ).map((c) => ({ ...c, memberCount: 0 }))
     }
 
-    // 2. Search Posts strictly from posts_public view
-    if (type === 'all' || type === 'posts') {
-      const { data: rawPosts } = await supabase
-        .from('posts_public')
-        .select('id, community_id, content, image_url, is_anonymous, is_pinned, created_at, author_id, author_username, author_display_name, author_avatar_url')
-        .ilike('content', `%${q}%`)
-        .limit(15)
+    const rawPosts = (postsRes.data ?? []) as PostPublicData[]
+    if (rawPosts.length > 0) {
+      const communityIds = Array.from(new Set(rawPosts.map((p) => p.community_id)))
+      const [{ data: comms }, meta] = await Promise.all([
+        supabase.from('communities').select('id, slug, name').in('id', communityIds),
+        loadPostMeta(
+          supabase,
+          rawPosts.map((p) => p.id),
+          user?.id
+        ),
+      ])
 
-      if (rawPosts) posts = rawPosts as PostPublicData[]
+      const byId = new Map(
+        ((comms ?? []) as { id: string; slug: string; name: string }[]).map((c) => [c.id, c])
+      )
+
+      posts = rawPosts.map((p) => ({
+        ...p,
+        community_slug: byId.get(p.community_id)?.slug,
+        community_name: byId.get(p.community_id)?.name,
+        reactions: meta.reactions[p.id] ?? [],
+        commentCount: meta.commentCounts[p.id] ?? 0,
+      }))
     }
 
-    // 3. Search Profiles
-    if (type === 'all' || type === 'members') {
-      const { data: rawProfs } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, avatar_url, bio')
-        .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
-        .limit(10)
-
-      if (rawProfs) profiles = rawProfs as { id: string; username: string; display_name: string | null; avatar_url: string | null; bio: string | null }[]
+    if (profilesRes.data) {
+      profiles = profilesRes.data as typeof profiles
     }
   }
 
   const totalResults = communities.length + posts.length + profiles.length
+  const counts: Record<SearchTab, number> = {
+    all: totalResults,
+    communities: communities.length,
+    posts: posts.length,
+    members: profiles.length,
+  }
+
+  const tabHref = (tab: SearchTab) => {
+    const params = new URLSearchParams()
+    if (rawTerm) params.set('q', rawTerm)
+    if (tab !== 'all') params.set('type', tab)
+    const qs = params.toString()
+    return qs ? `/search?${qs}` : '/search'
+  }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 py-2">
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-foreground">Search</h1>
+    <div className="page page-wide space-y-5">
+      <header className="space-y-3">
+        <h1 className="page-title">Search</h1>
         <SearchBar />
 
-        {/* Filter Tabs */}
-        {q && (
-          <div className="flex items-center gap-1 border-b border-border pb-2 text-xs font-semibold overflow-x-auto">
-            <Link
-              href={`/search?q=${encodeURIComponent(q)}&type=all`}
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                type === 'all' ? 'bg-brand text-white' : 'text-muted hover:text-foreground'
-              }`}
-            >
-              All Results ({totalResults})
-            </Link>
-            <Link
-              href={`/search?q=${encodeURIComponent(q)}&type=communities`}
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                type === 'communities' ? 'bg-brand text-white' : 'text-muted hover:text-foreground'
-              }`}
-            >
-              Communities ({communities.length})
-            </Link>
-            <Link
-              href={`/search?q=${encodeURIComponent(q)}&type=posts`}
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                type === 'posts' ? 'bg-brand text-white' : 'text-muted hover:text-foreground'
-              }`}
-            >
-              Posts ({posts.length})
-            </Link>
-            <Link
-              href={`/search?q=${encodeURIComponent(q)}&type=members`}
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                type === 'members' ? 'bg-brand text-white' : 'text-muted hover:text-foreground'
-              }`}
-            >
-              People ({profiles.length})
-            </Link>
-          </div>
+        {rawTerm && (
+          <nav aria-label="Filter results" className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5">
+            {TABS.map((tab) => (
+              <Link
+                key={tab}
+                href={tabHref(tab)}
+                aria-current={activeTab === tab ? 'page' : undefined}
+                className={`tab ${activeTab === tab ? 'tab-active' : ''}`}
+              >
+                {TAB_LABELS[tab]}
+                <span className="text-muted">{counts[tab]}</span>
+              </Link>
+            ))}
+          </nav>
         )}
-      </div>
+      </header>
 
-      {q.trim() && totalResults === 0 && (
-        <div className="card p-12 text-center border border-border bg-surface">
-          <div className="text-4xl mb-3">🔍</div>
-          <h3 className="text-base font-semibold text-foreground">No matches found</h3>
-          <p className="text-sm text-muted mt-1">
-            Try checking for typos or searching with different keywords.
+      {/* Initial state */}
+      {!rawTerm && (
+        <div className="card px-6 py-16 text-center">
+          <div className="text-3xl" aria-hidden="true">
+            🔍
+          </div>
+          <p className="mt-3 text-base font-semibold text-foreground">
+            Find communities, discussions and people
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            Start typing above — results update as you go.
           </p>
         </div>
       )}
 
-      {/* Communities Section */}
+      {/* Nothing found */}
+      {rawTerm && totalResults === 0 && (
+        <div className="card px-6 py-16 text-center">
+          <div className="text-3xl" aria-hidden="true">
+            🫥
+          </div>
+          <h2 className="mt-3 text-base font-semibold text-foreground">No matches</h2>
+          <p className="mt-1 text-sm text-muted">
+            Nothing matched “{rawTerm}”. Try a shorter or more general term.
+          </p>
+        </div>
+      )}
+
       {communities.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">
-            Communities ({communities.length})
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <section className="space-y-3">
+          <h2 className="eyebrow">Communities · {communities.length}</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {communities.map((c) => (
               <CommunityCard key={c.id} community={c} />
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* People Section */}
       {profiles.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">
-            People ({profiles.length})
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <section className="space-y-3">
+          <h2 className="eyebrow">People · {profiles.length}</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {profiles.map((p) => (
               <Link
                 key={p.id}
                 href={`/u/${p.username}`}
-                className="card p-3.5 border border-border bg-surface hover:border-brand/40 flex items-center gap-3 transition-colors group"
+                className="card card-interactive flex items-center gap-3 p-3.5"
               >
-                <Avatar
-                  src={p.avatar_url}
-                  name={p.display_name || p.username}
-                  size={42}
-                />
+                <Avatar src={p.avatar_url} name={p.display_name || p.username} size={40} />
                 <div className="min-w-0">
-                  <div className="font-semibold text-sm text-foreground group-hover:text-brand transition-colors truncate">
+                  <div className="truncate text-sm font-semibold text-foreground">
                     {p.display_name || p.username}
                   </div>
-                  <div className="text-xs text-muted">@{p.username}</div>
+                  <div className="truncate text-xs text-muted">@{p.username}</div>
                 </div>
               </Link>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Posts Section */}
       {posts.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-muted">
-            Posts ({posts.length})
-          </h2>
+        <section className="space-y-3">
+          <h2 className="eyebrow">Posts · {posts.length}</h2>
           <div className="space-y-3">
             {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                currentUserId={user?.id}
-              />
+              <PostCard key={post.id} post={post} currentUserId={user?.id} />
             ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   )

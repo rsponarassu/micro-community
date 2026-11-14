@@ -3,21 +3,17 @@ import { Search } from 'lucide-react'
 
 export default function NotFound() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-      <div className="text-7xl font-black mb-4 gradient-text-brand">404</div>
-      <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>
-        Page not found
-      </h1>
-      <p className="text-sm mb-8 max-w-sm" style={{ color: 'var(--color-text-muted)' }}>
+    <div className="flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
+      <div className="gradient-text-brand mb-3 text-6xl font-black tracking-tight">404</div>
+      <h1 className="text-xl font-bold text-foreground">Page not found</h1>
+      <p className="mt-2 mb-7 max-w-sm text-sm text-muted">
         The page you&apos;re looking for doesn&apos;t exist or has been moved.
       </p>
-      <div className="flex gap-3">
-        <Link href="/" className="px-4 py-2 rounded-lg text-sm font-medium text-white"
-          style={{ background: 'var(--color-brand)' }}>
+      <div className="flex gap-2.5">
+        <Link href="/" className="btn btn-primary">
           Go home
         </Link>
-        <Link href="/discover" className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
-          style={{ background: 'var(--color-surface-overlay)', color: 'var(--color-text-secondary)' }}>
+        <Link href="/discover" className="btn btn-secondary">
           <Search size={15} />
           Discover
         </Link>

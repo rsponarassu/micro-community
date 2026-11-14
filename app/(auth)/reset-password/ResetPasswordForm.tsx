@@ -21,8 +21,8 @@ export default function ResetPasswordForm() {
   return (
     <form action={action} className="space-y-4">
       {state?.message && (
-        <div className="p-3 rounded-lg text-sm"
-          style={{ background: 'hsl(0 84% 95%)', color: 'var(--color-error)', border: '1px solid hsl(0 84% 85%)' }}
+        <div className="rounded-[var(--radius-md)] border p-3 text-sm"
+          style={{ background: 'var(--color-danger-subtle)', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
           role="alert">
           {state.message}
         </div>
