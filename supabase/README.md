@@ -7,7 +7,7 @@ This directory contains the database migration scripts, seeds, and test suites f
 ## 1. Apply Schema (`schema.sql`)
 
 1. Open your Supabase project's SQL Editor:
-   👉 **[https://supabase.com/dashboard/project/mfgmaxoffhpsxzshobow/sql/new](https://supabase.com/dashboard/project/mfgmaxoffhpsxzshobow/sql/new)**
+   👉 **`https://supabase.com/dashboard/project/<your-project-ref>/sql/new`**
 2. Copy the entire contents of [`supabase/schema.sql`](./schema.sql).
 3. Paste into the SQL editor and click **Run**.
 4. Expected result: `Success. No rows returned`.
@@ -44,7 +44,7 @@ This directory contains the database migration scripts, seeds, and test suites f
 ## 2. Seed Initial Data (`seed.sql`)
 
 1. Open a new query tab in SQL Editor:
-   👉 **[https://supabase.com/dashboard/project/mfgmaxoffhpsxzshobow/sql/new](https://supabase.com/dashboard/project/mfgmaxoffhpsxzshobow/sql/new)**
+   👉 **`https://supabase.com/dashboard/project/<your-project-ref>/sql/new`**
 2. Copy the contents of [`supabase/seed.sql`](./seed.sql).
 3. Paste and click **Run**.
 4. This will populate:
@@ -66,16 +66,16 @@ This directory contains the database migration scripts, seeds, and test suites f
    - For `is_anonymous = FALSE`: `author_id` and `author_username` are visible.
    - For `is_anonymous = TRUE`: `author_id` and `author_username` are `NULL`.
 3. Check the output of **Test B**:
-   - The base `posts` table stores `user_id` strictly on the server for moderation and DB integrity, while client RLS restricts access to `posts_public`.
+   The base `posts` table stores `user_id` strictly on the server for moderation and DB integrity. `posts_public` is a `security_invoker` view, so the caller's RLS policies on `posts` still apply to every row, while the anonymous author columns are already `NULL` by the time the row leaves the database.
 
 ---
 
 ## 4. Generate TypeScript Database Types
 
-Once the schema has been applied to Supabase, run the following command in your terminal from the project root:
+Once the schema has been applied to Supabase, run the following command in your terminal from the project root, replacing the project ref with your own:
 
 ```powershell
-npx supabase gen types typescript --project-id mfgmaxoffhpsxzshobow > lib/supabase/types.ts
+npx supabase gen types typescript --project-id <your-project-ref> > lib/supabase/types.ts
 ```
 
 If you are not logged in with the Supabase CLI, you can log in first via:
