@@ -219,6 +219,7 @@ The app deploys to [Vercel](https://vercel.com/new) with no extra configuration.
 | Feeds and search return nothing while the database has rows | RLS is missing or stale. Re-run `supabase/schema.sql` |
 | Utilities like `bg-surface` or `text-muted` have no effect | The token is not declared inside `@theme` in `app/globals.css` |
 | Build fails with `Module not found` after a pull | Dependencies changed. Run `npm install` |
+| `TS1128: Declaration or statement expected` in `.next/dev/types/routes.d.ts` | `npm run build` and `npm run dev` ran at the same time and corrupted Next's generated route types. Stop both, delete the `.next` folder, then run one at a time — never build while the dev server is running |
 | Password reset or confirmation emails link to `localhost` | `NEXT_PUBLIC_SITE_URL` is wrong, or the URL isn't in Supabase's redirect allowlist |
 
 ---
