@@ -17,7 +17,7 @@ interface Profile {
 }
 
 interface TopbarProps {
-  user: User
+  user: User | null
   profile: Profile | null
   unreadCount: number
   onMenuOpen: () => void
@@ -88,39 +88,52 @@ export default function Topbar({ user, profile, unreadCount, onMenuOpen }: Topba
         </div>
         <ThemeToggle />
 
-        <Link
-          href="/notifications"
-          className="relative btn btn-ghost !p-2"
-          aria-label={
-            unreadCount > 0
-              ? `Notifications, ${unreadCount} unread`
-              : 'Notifications'
-          }
-        >
-          <Bell size={18} />
-          {unreadCount > 0 && (
-            <span
-              className={cn(
-                'absolute top-0.5 right-0.5 flex items-center justify-center rounded-full bg-danger text-white font-bold ring-2 ring-surface',
-                unreadCount > 9 ? 'h-4 min-w-4 px-1 text-[9px]' : 'h-4 w-4 text-[9px]'
-              )}
+        {user ? (
+          <>
+            <Link
+              href="/notifications"
+              className="relative btn btn-ghost !p-2"
+              aria-label={
+                unreadCount > 0
+                  ? `Notifications, ${unreadCount} unread`
+                  : 'Notifications'
+              }
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </Link>
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span
+                  className={cn(
+                    'absolute top-0.5 right-0.5 flex items-center justify-center rounded-full bg-danger text-white font-bold ring-2 ring-surface',
+                    unreadCount > 9 ? 'h-4 min-w-4 px-1 text-[9px]' : 'h-4 w-4 text-[9px]'
+                  )}
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </Link>
 
-        <Link
-          href={profile ? `/u/${profile.username}` : '/settings'}
-          aria-label="Your profile"
-          className="ml-0.5 rounded-full ring-offset-2 ring-offset-surface focus-visible:ring-2 focus-visible:ring-brand"
-        >
-          <Avatar
-            src={profile?.avatar_url}
-            name={profile?.display_name ?? user.email ?? '?'}
-            size={30}
-          />
-        </Link>
+            <Link
+              href={profile ? `/u/${profile.username}` : '/settings'}
+              aria-label="Your profile"
+              className="ml-0.5 rounded-full ring-offset-2 ring-offset-surface focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              <Avatar
+                src={profile?.avatar_url}
+                name={profile?.display_name ?? user.email ?? '?'}
+                size={30}
+              />
+            </Link>
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5 ml-1">
+            <Link href="/login" className="btn btn-secondary btn-sm text-xs py-1.5 px-3">
+              Sign In
+            </Link>
+            <Link href="/signup" className="btn btn-primary btn-sm text-xs py-1.5 px-3 hidden sm:inline-flex shadow-sm">
+              Join Free
+            </Link>
+          </div>
+        )}
       </div>
     </header>
   )

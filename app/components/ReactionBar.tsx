@@ -47,7 +47,11 @@ export default function ReactionBar({
     }
 
     const previous = reactions
-    sound.playPop()
+    if (type === 'love') {
+      sound.playHeart()
+    } else {
+      sound.playPop()
+    }
     setShowPicker(false)
     setReactions(applyReaction(previous, type))
 

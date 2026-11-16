@@ -1,14 +1,7 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
 import NotificationListener from '@/app/components/layout/NotificationListener'
 import ToastProvider from '@/app/components/layout/ToastProvider'
 import './globals.css'
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: {
@@ -53,7 +46,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
-      <body className={inter.variable}>
+      <body className="font-sans antialiased min-h-screen bg-bg text-foreground selection:bg-brand/20 selection:text-brand">
         {children}
         <NotificationListener />
         <ToastProvider />

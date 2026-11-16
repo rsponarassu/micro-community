@@ -1,7 +1,8 @@
 'use client'
 
-// Web Audio API Sound Synthesizer for high-fidelity micro-interactions
-// No external MP3 downloads required; instant, low-latency, zero-bandwidth
+// High-Fidelity Web Audio API Sound Synthesizer
+// Zero external MP3 downloads required; instant, low-latency, zero-bandwidth, offline-ready
+// Engineered for micro-interactions, reactions, modal reveals, and aesthetic feedback
 
 class SoundEffects {
   private ctx: AudioContext | null = null
@@ -16,16 +17,20 @@ class SoundEffects {
 
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      if (AudioCtx) {
-        this.ctx = new AudioCtx()
+    try {
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+        if (AudioCtx) {
+          this.ctx = new AudioCtx()
+        }
       }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {})
+      }
+      return this.ctx
+    } catch {
+      return null
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {})
-    }
-    return this.ctx
   }
 
   public isEnabled(): boolean {
@@ -38,7 +43,7 @@ class SoundEffects {
       localStorage.setItem('sound_enabled', String(this.enabled))
     }
     if (this.enabled) {
-      this.playSuccess()
+      this.playSparkle()
     }
     return this.enabled
   }
@@ -53,10 +58,10 @@ class SoundEffects {
       const gain = ctx.createGain()
 
       osc.type = 'sine'
-      osc.frequency.setValueAtTime(600, ctx.currentTime)
-      osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.04)
+      osc.frequency.setValueAtTime(640, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(260, ctx.currentTime + 0.04)
 
-      gain.gain.setValueAtTime(0.08, ctx.currentTime)
+      gain.gain.setValueAtTime(0.09, ctx.currentTime)
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04)
 
       osc.connect(gain)
@@ -64,9 +69,7 @@ class SoundEffects {
 
       osc.start(ctx.currentTime)
       osc.stop(ctx.currentTime + 0.04)
-    } catch {
-      // Audio context policy fallback
-    }
+    } catch {}
   }
 
   public playPop() {
@@ -79,7 +82,7 @@ class SoundEffects {
       const gain = ctx.createGain()
 
       osc.type = 'triangle'
-      osc.frequency.setValueAtTime(400, ctx.currentTime)
+      osc.frequency.setValueAtTime(420, ctx.currentTime)
       osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.08)
 
       gain.gain.setValueAtTime(0.12, ctx.currentTime)
@@ -111,13 +114,13 @@ class SoundEffects {
 
         const startTime = now + idx * 0.06
         gain.gain.setValueAtTime(0.09, startTime)
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.18)
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2)
 
         osc.connect(gain)
         gain.connect(ctx.destination)
 
         osc.start(startTime)
-        osc.stop(startTime + 0.18)
+        osc.stop(startTime + 0.2)
       })
     } catch {}
   }
@@ -148,6 +151,114 @@ class SoundEffects {
         osc.start(startTime)
         osc.stop(startTime + 0.25)
       })
+    } catch {}
+  }
+
+  public playHeart() {
+    if (!this.enabled) return
+    const ctx = this.getContext()
+    if (!ctx) return
+
+    try {
+      const now = ctx.currentTime
+      const beats = [587.33, 739.99] // D5 -> F#5 warm double beat
+
+      beats.forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, now + idx * 0.09)
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.15, now + idx * 0.09 + 0.1)
+
+        gain.gain.setValueAtTime(0.11, now + idx * 0.09)
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.12)
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+
+        osc.start(now + idx * 0.09)
+        osc.stop(now + idx * 0.09 + 0.12)
+      })
+    } catch {}
+  }
+
+  public playSparkle() {
+    if (!this.enabled) return
+    const ctx = this.getContext()
+    if (!ctx) return
+
+    try {
+      const now = ctx.currentTime
+      const notes = [1046.5, 1318.5, 1567.98, 2093.0] // C6, E6, G6, C7 shimmering chime
+
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        osc.type = 'sine'
+        osc.frequency.value = freq
+
+        const startTime = now + idx * 0.04
+        gain.gain.setValueAtTime(0.07, startTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.24)
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+
+        osc.start(startTime)
+        osc.stop(startTime + 0.24)
+      })
+    } catch {}
+  }
+
+  public playWhoosh() {
+    if (!this.enabled) return
+    const ctx = this.getContext()
+    if (!ctx) return
+
+    try {
+      const now = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(200, now)
+      osc.frequency.exponentialRampToValueAtTime(500, now + 0.07)
+      osc.frequency.exponentialRampToValueAtTime(150, now + 0.15)
+
+      gain.gain.setValueAtTime(0.06, now)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15)
+
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      osc.start(now)
+      osc.stop(now + 0.15)
+    } catch {}
+  }
+
+  public playHover() {
+    if (!this.enabled) return
+    const ctx = this.getContext()
+    if (!ctx) return
+
+    try {
+      const now = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(800, now)
+
+      gain.gain.setValueAtTime(0.02, now)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.025)
+
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      osc.start(now)
+      osc.stop(now + 0.025)
     } catch {}
   }
 

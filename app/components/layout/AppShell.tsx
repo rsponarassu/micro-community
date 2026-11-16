@@ -21,7 +21,7 @@ interface Profile {
 }
 
 interface AppShellProps {
-  user: User
+  user: User | null
   profile: Profile | null
   joinedCommunities: Community[]
   unreadCount: number

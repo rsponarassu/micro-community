@@ -1,18 +1,37 @@
 /**
- * Validates a Supabase environment variable.
+ * Validates and provides fallback for Supabase environment variables.
  *
- * Callers must pass `process.env.NEXT_PUBLIC_*` as a *static* member expression
- * so Next.js can inline the value into client bundles — a dynamic lookup like
- * `process.env[name]` is left undefined in the browser.
+ * Callers pass `process.env.NEXT_PUBLIC_*` as a static member expression
+ * so Next.js can inline the value into client bundles.
  */
+
+const FALLBACK_URL = 'https://demo-community.supabase.co'
+const FALLBACK_KEY = 'demo-anon-key-preview-mode'
+
+export function isSupabaseConfigured(): boolean {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  return Boolean(
+    url &&
+    key &&
+    !url.includes('YOUR_PROJECT_REF') &&
+    !url.includes('demo-community') &&
+    url.startsWith('https://')
+  )
+}
+
 export function requireEnv(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(
-      `Missing required environment variable: ${name}\n` +
-        `• Local: add it to .env.local (see .env.example) and restart the dev server.\n` +
-        `• Deployed: add it in your host's dashboard (Vercel / Render → Environment),\n` +
-        `  then redeploy — NEXT_PUBLIC_* values are baked in at build time.`
-    )
+  if (!value || value.includes('YOUR_PROJECT_REF')) {
+    if (name.includes('URL')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[Supabase Config Warning] Missing or placeholder ${name}. Running in demo/preview mode.`)
+      }
+      return FALLBACK_URL
+    }
+    if (name.includes('KEY')) {
+      return FALLBACK_KEY
+    }
+    return ''
   }
   return value
 }

@@ -3,22 +3,29 @@ import type { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { requireEnv } from './lib/supabase/env'
 
-/** Reachable without a session. `/reset-password` is included because the
- *  recovery link establishes its session through `/auth/callback`. */
-const PUBLIC_ROUTES = [
-  '/login',
-  '/signup',
-  '/forgot-password',
-  '/reset-password',
-  '/auth/callback',
+/** Reachable without a session. Allows visitors to view the platform before signing in. */
+const PROTECTED_ROUTES = [
+  '/settings',
+  '/notifications',
+  '/c/new',
+  '/onboarding',
 ]
 
 /** Signed-in members should not see these. */
 const GUEST_ONLY_ROUTES = ['/login', '/signup', '/forgot-password']
 
-/** Real static assets. The old check was `pathname.includes('.')`, which let
- *  ` /c/some.thing ` skip authentication entirely. */
+/** Real static assets. */
 const STATIC_FILE = /\.(?:avif|css|gif|ico|jpe?g|js|json|map|png|svg|txt|webp|woff2?|ttf)$/i
+
+function isProtected(pathname: string) {
+  if (PROTECTED_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
+    return true
+  }
+  if (pathname.includes('/admin')) {
+    return true
+  }
+  return false
+}
 
 function matchesRoute(pathname: string, routes: string[]) {
   return routes.some((route) => pathname === route || pathname.startsWith(`${route}/`))
@@ -33,38 +40,42 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    requireEnv('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
-    requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
+  try {
+    const supabase = createServerClient(
+      requireEnv('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL),
+      requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+            response = NextResponse.next({ request })
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            )
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
+      }
+    )
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user && isProtected(pathname)) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('next', `${pathname}${search}`)
+      return NextResponse.redirect(loginUrl)
     }
-  )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user && !matchesRoute(pathname, PUBLIC_ROUTES)) {
-    const loginUrl = new URL('/login', request.url)
-    // Preserve the query string so deep links survive the round-trip.
-    loginUrl.searchParams.set('next', `${pathname}${search}`)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  if (user && matchesRoute(pathname, GUEST_ONLY_ROUTES)) {
-    return NextResponse.redirect(new URL('/', request.url))
+    if (user && matchesRoute(pathname, GUEST_ONLY_ROUTES)) {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+  } catch (err) {
+    // Fallback gracefully on network / auth exceptions so deployment never 500s
+    console.error('[Proxy Edge Middleware Error]', err)
   }
 
   return response

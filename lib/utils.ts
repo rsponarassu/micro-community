@@ -91,3 +91,16 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2)
 }
+
+/** Check if an error is an internal Next.js control-flow signal (redirect, notFound, dynamic bailout) */
+export function isNextInternalError(error: unknown): boolean {
+  if (typeof error === 'object' && error !== null && 'digest' in error) {
+    const digest = String((error as { digest?: string }).digest)
+    return (
+      digest.startsWith('NEXT_') ||
+      digest === 'DYNAMIC_SERVER_USAGE' ||
+      digest.includes('BAILOUT')
+    )
+  }
+  return false
+}

@@ -23,8 +23,8 @@ export default function MobileNav({ unreadCount, username }: MobileNavProps) {
   const items = [
     ...NAV_ITEMS,
     {
-      href: username ? `/u/${username}` : '/settings',
-      label: 'Profile',
+      href: username ? `/u/${username}` : '/login',
+      label: username ? 'Profile' : 'Sign In',
       icon: User,
       exact: false,
     },

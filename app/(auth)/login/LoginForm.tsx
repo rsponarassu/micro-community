@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { signIn, type AuthFormState } from '@/app/actions/auth'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+import { sound } from '@/lib/sound'
 
 function FieldError({ errors }: { errors?: string[] }) {
   if (!errors?.length) return null
@@ -33,9 +34,11 @@ export default function LoginForm({ nextPath }: { nextPath?: string }) {
 
   useEffect(() => {
     if (state?.errors) {
+      sound.playError()
       const firstError = Object.values(state.errors).flat()[0]
       if (firstError) toast.error(firstError)
     } else if (state?.message && !state.success) {
+      sound.playError()
       toast.error(friendlyAuthError(state.message))
     }
   }, [state])

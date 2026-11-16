@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import { sound } from '@/lib/sound'
 
 type Theme = 'light' | 'dark'
 
@@ -33,6 +34,7 @@ export default function ThemeToggle() {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   const toggle = useCallback(() => {
+    sound.playClick()
     const root = document.documentElement
     const next: Theme = root.dataset.theme === 'dark' ? 'light' : 'dark'
 

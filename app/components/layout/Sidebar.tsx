@@ -18,6 +18,7 @@ import type { User } from '@supabase/supabase-js'
 import { cn } from '@/lib/utils'
 import Avatar from '@/app/components/ui/Avatar'
 import { signOut } from '@/app/actions/auth'
+import { sound } from '@/lib/sound'
 
 interface Community {
   id: string
@@ -33,7 +34,7 @@ interface Profile {
 }
 
 interface SidebarProps {
-  user: User
+  user: User | null
   profile: Profile | null
   joinedCommunities: Community[]
   isOpen: boolean
@@ -101,7 +102,10 @@ export default function Sidebar({
               <Link
                 key={href}
                 href={href}
-                onClick={onClose}
+                onClick={() => {
+                  sound.playClick()
+                  onClose()
+                }}
                 className={cn(
                   'flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors',
                   active
@@ -185,50 +189,82 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Account */}
-      <div className="border-t border-border p-2.5 shrink-0">
-        <div className="flex items-center gap-2">
-          <Link
-            href={profile ? `/u/${profile.username}` : '/settings'}
-            onClick={onClose}
-            className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-surface-overlay transition-colors min-w-0 flex-1"
-          >
-            <Avatar
-              src={profile?.avatar_url}
-              name={profile?.display_name ?? user.email ?? '?'}
-              size={30}
-            />
-            <span className="min-w-0">
-              <span className="block text-[13px] font-medium text-foreground truncate">
-                {profile?.display_name ?? 'Set up profile'}
-              </span>
-              <span className="block text-[11px] text-muted truncate">
-                {profile?.username ? `@${profile.username}` : user.email}
-              </span>
-            </span>
-          </Link>
-
-          <Link
-            href="/settings"
-            onClick={onClose}
-            className="btn btn-ghost !p-1.5"
-            aria-label="Account settings"
-            title="Account settings"
-          >
-            <Settings size={16} />
-          </Link>
-
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="btn btn-ghost !p-1.5"
-              aria-label="Sign out"
-              title="Sign out"
+      {/* Account / Guest Actions */}
+      <div className="border-t border-border p-3 shrink-0">
+        {user ? (
+          <div className="flex items-center gap-2">
+            <Link
+              href={profile ? `/u/${profile.username}` : '/settings'}
+              onClick={() => {
+                sound.playClick()
+                onClose()
+              }}
+              className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover:bg-surface-overlay transition-colors min-w-0 flex-1"
             >
-              <LogOut size={16} />
-            </button>
-          </form>
-        </div>
+              <Avatar
+                src={profile?.avatar_url}
+                name={profile?.display_name ?? user.email ?? '?'}
+                size={30}
+              />
+              <span className="min-w-0">
+                <span className="block text-[13px] font-medium text-foreground truncate">
+                  {profile?.display_name ?? 'Set up profile'}
+                </span>
+                <span className="block text-[11px] text-muted truncate">
+                  {profile?.username ? `@${profile.username}` : user.email}
+                </span>
+              </span>
+            </Link>
+
+            <Link
+              href="/settings"
+              onClick={() => {
+                sound.playClick()
+                onClose()
+              }}
+              className="btn btn-ghost !p-1.5"
+              aria-label="Account settings"
+              title="Account settings"
+            >
+              <Settings size={16} />
+            </Link>
+
+            <form action={signOut}>
+              <button
+                type="submit"
+                onClick={() => sound.playClick()}
+                className="btn btn-ghost !p-1.5"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut size={16} />
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 p-1">
+            <Link
+              href="/login"
+              onClick={() => {
+                sound.playPop()
+                onClose()
+              }}
+              className="btn btn-primary w-full justify-center text-xs py-2 shadow-sm font-semibold"
+            >
+              Sign In to Post
+            </Link>
+            <Link
+              href="/signup"
+              onClick={() => {
+                sound.playClick()
+                onClose()
+              }}
+              className="btn btn-secondary w-full justify-center text-xs py-2"
+            >
+              Create Account
+            </Link>
+          </div>
+        )}
       </div>
     </aside>
   )
