@@ -80,6 +80,7 @@ export default function CommunityForm() {
   }
 
   return (
+
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Form column */}
       <div className="lg:col-span-2">
@@ -181,9 +182,8 @@ export default function CommunityForm() {
             <span className="text-sm font-medium text-foreground block">Privacy</span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label
-                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                  !isPrivate ? 'border-brand bg-brand/5' : 'border-border bg-surface-raised'
-                }`}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${!isPrivate ? 'border-brand bg-brand/5' : 'border-border bg-surface-raised'
+                  }`}
               >
                 <input
                   type="radio"
@@ -204,9 +204,8 @@ export default function CommunityForm() {
               </label>
 
               <label
-                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                  isPrivate ? 'border-brand bg-brand/5' : 'border-border bg-surface-raised'
-                }`}
+                className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${isPrivate ? 'border-brand bg-brand/5' : 'border-border bg-surface-raised'
+                  }`}
               >
                 <input
                   type="radio"
